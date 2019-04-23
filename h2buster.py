@@ -1,6 +1,6 @@
 #coding=utf-8
 
-__author__ = "0xc"
+__author__ = "https://github.com/00xc/"
 __version__ = "0.1"
 
 try:
@@ -73,8 +73,6 @@ try:
 	# Scan directory over connection "conn" with dictionary "file". Admits recursion.
 	def recursive_dirscan(conn, directory, file, ext):
 
-		global total_length
-
 		i = 0
 		requests = dict()
 		found = list()
@@ -124,6 +122,10 @@ try:
 				recursive_dirscan(conn, fd, file, ext)
 
 	if __name__ == "__main__":
+
+		print("--------------------------------")
+		print("h2buster v" + __version__)
+		print("--------------------------------\n")
 
 		# For benchmarking purposes
 		t0 = time.time()
