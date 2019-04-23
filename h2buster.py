@@ -1,7 +1,7 @@
 #coding=utf-8
 
 __author__ = "0xc"
-__version__ = "0.1b"
+__version__ = "0.1"
 
 try:
 	import hyper
