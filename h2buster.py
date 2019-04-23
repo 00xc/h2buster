@@ -80,8 +80,9 @@ try:
 		l = ["|", "/", "-", "\\"]
 		t = 0
 
-		# Main loop
 		with open(file, "r") as f:
+			
+			# Main loop
 			for entry in f:
 				entry = entry.rstrip()
 
