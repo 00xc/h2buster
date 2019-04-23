@@ -9,4 +9,5 @@
 	- Time between requests
 	- Require valid certificates
 * Make the search breadth-first?. Probably need to break recursion for that
+* Update to [hyper-h2](https://github.com/python-hyper/hyper-h2)
 * Add support for HTTP/1 (not a priority whatsoever)
