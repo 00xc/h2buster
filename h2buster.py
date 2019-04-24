@@ -1,7 +1,7 @@
 #coding=utf-8
 
 __author__ = "https://github.com/00xc/"
-__version__ = "0.1b"
+__version__ = "0.1c"
 
 import hyper
 import ssl, sys, time
@@ -12,8 +12,7 @@ MAX_RECURSION = 2
 # This controls how often we read responses and update results on screen
 # If this value is too high we're opening too many streams without reading responses
 # If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
-# This value is eyeballed, it should be tested more thoroughly
-UPDATE_THRESHOLD = 30
+UPDATE_THRESHOLD = 99
 
 # Parse target and check if its HTTPS
 def check_tls(ip):
@@ -26,7 +25,6 @@ def check_tls(ip):
 		elif ip[0] == "https": s = 1
 		else: sys.exit("[-] Target not understood")
 		ip = ip[1]
-
 	return s, ip
 
 # Connect to target and return connection object
@@ -46,34 +44,32 @@ def h2_connect(ip, s):
 		conn = hyper.HTTP20Connection(ip, port=port, enable_push=False)
 	# Test connectivity before starting the scan
 	conn.ping("00000000")
-
 	return conn
 
 # Read responses, print results and return found directories
 def dump_scan(requests):
 
-	# List of directories that didn't return 404
+	# List of directories that will be recursively scanned afterwards
 	o = list()
 
-	for key, element in requests.items():
-		resp = conn.get_response(element)
+	for url, sid in requests.items():
+		resp = conn.get_response(sid)
 		status = resp.status
-		#resp.read(decode_content=True) # This seems to improve performance
+		#resp.read() # Not reading the entire response improves performance, but might be needed in the future
 		resp.close()
 
 		# Print meaningful results
 		if status != 404:
-			if key[-1] == "/":
-				if status != 301: o.append(key)
-				ftype = " <DIR>"
+			if status==301 or status==302:
+				ftype = " <REDIRECTION> -> " + resp.headers.get(b"location")[0].decode("utf-8")
+			elif url[-1]=="/":
+				o.append(url)
+				ftype = " <DIRECTORY>"
 			else: ftype = ""
-			print("[+] " + key + ": " + str(status) + ftype)
-
-			# Print redirection location?
-			#if status == 301: print(resp.headers)
+			print("[+] " + url + ": " + str(status) + ftype)
 	return o
 
-# Scan directory over connection "conn" with dictionary "file". Admits recursion.
+# Scan directory over connection "conn" with dictionary "file"
 def recursive_dirscan(conn, directory, file, ext, rec_level):
 
 	if rec_level >= MAX_RECURSION: return
@@ -139,7 +135,7 @@ if __name__ == "__main__":
 		ip = sys.argv[2]
 
 		# For every entry in the dictionary, every extension will be checked
-		ext = ["/", ".php", ".html", ".htm", ".asp", ".js", ".css"]
+		ext = ["/", "",".php", ".html", ".htm", ".asp", ".js", ".css"]
 
 		# Check HTTP/HTTPS
 		s, ip = check_tls(ip)
@@ -150,7 +146,7 @@ if __name__ == "__main__":
 		# Main function
 		recursive_dirscan(conn, "/", file, ext, 0)
 
-		print("\n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds")
+		print(" \n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds")
 
 	except OSError as ose:
 		if ose.errno == 113: print("[-] No route to host")
