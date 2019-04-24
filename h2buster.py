@@ -149,8 +149,7 @@ if __name__ == "__main__":
 		print(" \n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds")
 
 	except OSError as ose:
-		if ose.errno == 113: print("[-] No route to host")
-		else: print(ose)
+		print(ose)
 
 	except FileNotFoundError:
 		print("[-] File not found")
