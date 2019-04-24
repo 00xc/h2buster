@@ -1,10 +1,19 @@
 #coding=utf-8
 
 __author__ = "https://github.com/00xc/"
-__version__ = "0.1a"
+__version__ = "0.1b"
 
 import hyper
 import ssl, sys, time
+
+# Maximum recursion depth for directories (minimum is 1)
+MAX_RECURSION = 2
+
+# This controls how often we read responses and update results on screen
+# If this value is too high we're opening too many streams without reading responses
+# If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
+# This value is eyeballed, it should be tested more thoroughly
+UPDATE_THRESHOLD = 30
 
 # Parse target and check if its HTTPS
 def check_tls(ip):
@@ -55,7 +64,7 @@ def dump_scan(requests):
 		# Print meaningful results
 		if status != 404:
 			if key[-1] == "/":
-				o.append(key)
+				if status != 301: o.append(key)
 				ftype = " <DIR>"
 			else: ftype = ""
 			print("[+] " + key + ": " + str(status) + ftype)
@@ -65,7 +74,11 @@ def dump_scan(requests):
 	return o
 
 # Scan directory over connection "conn" with dictionary "file". Admits recursion.
-def recursive_dirscan(conn, directory, file, ext):
+def recursive_dirscan(conn, directory, file, ext, rec_level):
+
+	if rec_level >= MAX_RECURSION: return
+
+	print(" \n[*] Scanning " + directory)
 
 	i = 0
 	requests = dict()
@@ -90,11 +103,7 @@ def recursive_dirscan(conn, directory, file, ext):
 					print(l[t], end="\r")
 					t = (t+1)%4
 					
-				# This controls how often we read responses and update results
-				# If this value is too high we're opening too many streams without reading responses
-				# If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
-				# This value (20) is eyeballed, it should be tested more thoroughly
-				if i>20:
+				if i>UPDATE_THRESHOLD:
 					found += dump_scan(requests)
 					requests.clear()
 					i = 0
@@ -110,8 +119,7 @@ def recursive_dirscan(conn, directory, file, ext):
 
 		# Recursively scan found directories
 		for fd in found:
-			print(" \n[*] Scanning " + fd)
-			recursive_dirscan(conn, fd, file, ext)
+			recursive_dirscan(conn, fd, file, ext, rec_level+1)
 
 if __name__ == "__main__":
 
@@ -140,12 +148,13 @@ if __name__ == "__main__":
 		print("[*] Starting scan on " + ip)
 
 		# Main function
-		recursive_dirscan(conn, "/", file, ext)
+		recursive_dirscan(conn, "/", file, ext, 0)
 
 		print("\n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds")
 
 	except OSError as ose:
-		print(ose)
+		if ose.errno == 113: print("[-] No route to host")
+		else: print(ose)
 
 	except FileNotFoundError:
 		print("[-] File not found")

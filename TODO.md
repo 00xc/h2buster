@@ -3,7 +3,7 @@
 * Update to [hyper-h2](https://github.com/python-hyper/hyper-h2).
 * Add command line options for more functionality. Some ideas:
 	- Configure ignored response codes (right now 404 is hardcoded).
-	- Deactivate recursion (just one top-level search).
+	- Configurable maximum recursion (right now it is a hardcoded constant).
 	- User-Agent string.
 	- HTTP basic auth.
 	- Proxy usage.
