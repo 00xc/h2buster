@@ -96,20 +96,20 @@ def recursive_dirscan(conn, directory, file, ext, rec_level):
 			if entry == "/" or entry=="": continue
 
 			for ex in ext:
-				# Prevent flood
-				time.sleep(0.05)
 				# Rotating bar
 				if int(time.time())%5==0:
 					print(l[t], end="\r")
 					t = (t+1)%4
+				# Don't need to scan entry.php/ so we skip it
+				if entry.split(".")[-1] in ext and ex=="/": continue
+				# Prevent flood
+				time.sleep(0.05)
 					
 				if i>UPDATE_THRESHOLD:
 					found += dump_scan(requests)
 					requests.clear()
 					i = 0
 
-				# Don't need to scan entry.php/ so we skip it
-				if len(entry.split(".")[-1]) in ext and ex=="/": continue
 				# Perform request and store stream ID
 				sid = conn.request("HEAD", directory + entry + ex)
 				requests[directory + entry + ex] = sid
