@@ -9,9 +9,7 @@ try:
 
 	# Parse target and check if its HTTPS
 	def check_tls(ip):
-
 		ip = ip.split("://")
-
 		if len(ip) == 1:
 			s = 0
 			ip = ip[0]
@@ -25,13 +23,11 @@ try:
 
 	# Connect to target and return connection object
 	def h2_connect(ip, s):
-
 		# Get port
 		if len(ip.split(":")) == 1:
 			if s==1: port=443
 			elif s==0: port=80
 		else: port = int(ip.split(":")[-1])
-
 		# Perform connection
 		if s == 1:
 			ctx = ssl.SSLContext()
@@ -40,7 +36,6 @@ try:
 			conn = hyper.HTTP20Connection(ip, port=port, ssl_context=ctx, enable_push=False)
 		elif s == 0:
 			conn = hyper.HTTP20Connection(ip, port=port, enable_push=False)
-
 		# Test connectivity before starting the scan
 		conn.ping("00000000")
 
@@ -89,15 +84,13 @@ try:
 				if entry == "/" or entry=="": continue
 
 				for ex in ext:
-
 					# Prevent flood
-					time.sleep(0.1)
-
+					time.sleep(0.05)
 					# Rotating bar
 					if int(time.time())%5==0:
 						print(l[t], end="\r")
 						t = (t+1)%4
-
+						
 					# This controls how often we read responses and update results
 					# If this value is too high we're opening too many streams without reading responses
 					# If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
@@ -109,7 +102,6 @@ try:
 
 					# Don't need to scan entry.php/ so we skip it
 					if len(entry.split(".")[-1]) in ext and ex=="/": continue
-
 					# Perform request and store stream ID
 					sid = conn.request("HEAD", directory + entry + ex)
 					requests[directory + entry + ex] = sid
@@ -130,7 +122,6 @@ try:
 
 		# For benchmarking purposes
 		t0 = time.time()
-
 		# Some basic input checking
 		if len(sys.argv)<3:
 			print("Usage: " + sys.argv[0] + " <dictionary> <target>")
@@ -143,7 +134,6 @@ try:
 
 		# Check HTTP/HTTPS
 		s, ip = check_tls(ip)
-
 		# Open connection
 		conn = h2_connect(ip, s)
 		print("[*] Starting scan on " + ip)
