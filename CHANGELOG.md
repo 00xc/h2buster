@@ -1,5 +1,11 @@
 # Changelog #
 
+## 0.1d ##
+* Changed CLI inputs from positional to optional arguments.
+* Added `maximum_recursion` as an option (`-r`).
+* Added help for each option with `-h | --help`.
+* Aborting scan now ensures that the connection is closed.
+
 ## 0.1c ##
 * Redirection response codes are now indicated with text. Redirection locations are printed.
 * Improved directory detection and results printing.

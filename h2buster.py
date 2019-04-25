@@ -1,10 +1,14 @@
 #coding=utf-8
 
-__author__ = "https://github.com/00xc/"
-__version__ = "0.1c"
-
 import hyper
 import ssl, sys, time
+import argparse
+
+__author__ = "https://github.com/00xc/"
+__version__ = "0.1d"
+
+# Program information to be displayed with -h or --help
+PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 
 # Maximum recursion depth for directories (minimum is 1)
 MAX_RECURSION = 2
@@ -13,6 +17,17 @@ MAX_RECURSION = 2
 # If this value is too high we're opening too many streams without reading responses
 # If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
 UPDATE_THRESHOLD = 99
+
+# Read inputs
+def read_inputs(info, opts, h, defaults, mvar):
+	import argparse
+	parser = argparse.ArgumentParser(description=info)
+	for i, o in enumerate(opts):
+		if defaults[i]==None: req = True
+		else: req = False
+		parser.add_argument("-"+o, help=h[i], default=defaults[i], required=req, metavar=mvar[i])
+	args = parser.parse_args()
+	return args
 
 # Parse target and check if its HTTPS
 def check_tls(ip):
@@ -51,7 +66,7 @@ def dump_scan(requests):
 
 	# List of directories that will be recursively scanned afterwards
 	o = list()
-
+	
 	for url, sid in requests.items():
 		resp = conn.get_response(sid)
 		status = resp.status
@@ -70,9 +85,9 @@ def dump_scan(requests):
 	return o
 
 # Scan directory over connection "conn" with dictionary "file"
-def recursive_dirscan(conn, directory, file, ext, rec_level):
+def recursive_dirscan(conn, directory, file, ext, rec_level, max_rec_level):
 
-	if rec_level >= MAX_RECURSION: return
+	if rec_level >= max_rec_level: return
 
 	print(" \n[*] Scanning " + directory)
 
@@ -115,7 +130,7 @@ def recursive_dirscan(conn, directory, file, ext, rec_level):
 
 		# Recursively scan found directories
 		for fd in found:
-			recursive_dirscan(conn, fd, file, ext, rec_level+1)
+			recursive_dirscan(conn, fd, file, ext, rec_level+1, max_rec_level)
 
 if __name__ == "__main__":
 
@@ -123,39 +138,50 @@ if __name__ == "__main__":
 	print("h2buster v" + __version__)
 	print("--------------------------------\n")
 
+	# For benchmarking purposes
+	t0 = time.time()
+
+	# For every entry in the dictionary, every extension will be checked
+	ext = ["/", "",".php", ".html", ".htm", ".asp", ".js", ".css"]
+
+	# Input reading
+	opts = ["w", "u", "r"]
+	mvar = ["wordlist", "target", "recursion_depth"]
+	h = ["Directory wordlist", "Target URL", "Maximum directory recursion depth. Minimum is 1, default is 2."]
+	defaults = [None, None, 2]	# None => argument is required
+	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
+
 	try:
 
-		# For benchmarking purposes
-		t0 = time.time()
-		# Some basic input checking
-		if len(sys.argv)<3:
-			print("Usage: " + sys.argv[0] + " <dictionary> <target>")
-			sys.exit()
-		file = sys.argv[1]
-		ip = sys.argv[2]
+		# Input checking
+		args.r = int(args.r)
+		if args.r<1:
+			sys.exit("[-] Recursion depth must be greater than 1.")
 
-		# For every entry in the dictionary, every extension will be checked
-		ext = ["/", "",".php", ".html", ".htm", ".asp", ".js", ".css"]
-
-		# Check HTTP/HTTPS
-		s, ip = check_tls(ip)
-		# Open connection
+		# Check HTTP/HTTPS and start connection
+		s, ip = check_tls(args.u)
 		conn = h2_connect(ip, s)
 		print("[*] Starting scan on " + ip)
+		print("[*] recursion_depth = " + str(args.r))
 
 		# Main function
-		recursive_dirscan(conn, "/", file, ext, 0)
+		recursive_dirscan(conn, "/", args.w, ext, 0, args.r)
+		conn.close()
 
-		print(" \n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds")
+		print(" \n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds.")
+
+	except ValueError:
+		print("[-] Recursion depth must be a numeric value.")
 
 	except OSError as ose:
 		print(ose)
 
 	except FileNotFoundError:
-		print("[-] File not found")
+		print("[-] File not found.")
 
 	except AssertionError:
-		print("[-] H2 not supported for that target")
+		print("[-] That target does not support HTTP/2.")
 
 	except KeyboardInterrupt:
-		print("\r[-] Scan aborted")
+		conn.close()
+		print("\r[-] Scan aborted after " + str(round(time.time()-t0, 3)) + " seconds.")
