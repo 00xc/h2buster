@@ -10,9 +10,6 @@ __version__ = "0.1d"
 # Program information to be displayed with -h or --help
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 
-# Maximum recursion depth for directories (minimum is 1)
-MAX_RECURSION = 2
-
 # This controls how often we read responses and update results on screen
 # If this value is too high we're opening too many streams without reading responses
 # If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
