@@ -8,7 +8,6 @@
 * Add command line options for more functionality. Some ideas:
 	- Subdomain scanning.
 	- Configure ignored response codes (right now 404 is hardcoded).
-	- Configurable maximum recursion (right now it is a hardcoded constant).
 	- User-Agent string.
 	- HTTP basic auth.
 	- Proxy usage.
