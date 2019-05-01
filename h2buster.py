@@ -1,23 +1,19 @@
-#coding=utf-8
-
 import hyper
-import ssl, sys, time
-import argparse
+import threading, queue
+import ssl, sys, time, argparse
+import urllib.parse
+from socket import gaierror
 
 __author__ = "https://github.com/00xc/"
-__version__ = "0.1d"
-
-# Program information to be displayed with -h or --help
+__version__ = "0.2"
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
+QUEUE_LIMIT = 100000
 
-# This controls how often we read responses and update results on screen
-# If this value is too high we're opening too many streams without reading responses
-# If this value is too low we're reading too often (not using stream multiplexing effectively due to single thread)
-UPDATE_THRESHOLD = 99
+# Global variable of extensions
+ext = ["/", "" ,".php", ".html", ".asp", ".js", ".css"]
 
-# Read inputs
+# Read "opts" options from command line
 def read_inputs(info, opts, h, defaults, mvar):
-	import argparse
 	parser = argparse.ArgumentParser(description=info)
 	for i, o in enumerate(opts):
 		if defaults[i]==None: req = True
@@ -30,14 +26,14 @@ def read_inputs(info, opts, h, defaults, mvar):
 def check_tls(ip):
 	ip = ip.split("://")
 	if len(ip) == 1:
-		s = 0
+		s = 1
 		ip = ip[0]
 	else:
 		if ip[0] == "http": s = 0
 		elif ip[0] == "https": s = 1
 		else: sys.exit("[-] Target not understood")
 		ip = ip[1]
-	return s, ip
+	return ip, s
 
 # Connect to target and return connection object
 def h2_connect(ip, s):
@@ -46,7 +42,7 @@ def h2_connect(ip, s):
 		if s==1: port=443
 		elif s==0: port=80
 	else: port = int(ip.split(":")[-1])
-	# Perform connection
+	# Start connection
 	if s == 1:
 		ctx = ssl.SSLContext()
 		ctx.set_alpn_protocols(['h2'])
@@ -55,129 +51,134 @@ def h2_connect(ip, s):
 	elif s == 0:
 		conn = hyper.HTTP20Connection(ip, port=port, enable_push=False)
 	# Test connectivity before starting the scan
+	try: conn.connect()
+	except AssertionError: sys.exit("H2 not supported for that target.")
+	except gaierror as excp: sys.exit(excp)
+	except Exception as excp: sys.exit(excp)
 	conn.ping("00000000")
-	return conn
+	return conn, port
 
-# Read responses, print results and return found directories
-def dump_scan(requests):
+# Thread function
+def stream_worker(q, conn, output):
+	global ext
+	results = dict()
+	redirections = dict()
 
-	# List of directories that will be recursively scanned afterwards
-	o = list()
-	
-	for url, sid in requests.items():
-		resp = conn.get_response(sid)
-		status = resp.status
-		#resp.read() # Not reading the entire response improves performance, but might be needed in the future
-		resp.close()
-
-		# Print meaningful results
-		if status != 404:
-			if status==301 or status==302:
-				ftype = " <REDIRECTION> -> " + resp.headers.get(b"location")[0].decode("utf-8")
-			elif url[-1]=="/":
-				o.append(url)
-				ftype = " <DIRECTORY>"
-			else: ftype = ""
-			print("[+] " + url + ": " + str(status) + ftype)
-	return o
-
-# Scan directory over connection "conn" with dictionary "file"
-def recursive_dirscan(conn, directory, file, ext, rec_level, max_rec_level):
-
-	if rec_level >= max_rec_level: return
-
-	print(" \n[*] Scanning " + directory)
-
-	i = 0
-	requests = dict()
-	found = list()
-
-	l = ["|", "/", "-", "\\"]
-	t = 0
-
-	with open(file, "r") as f:
-		
-		# Main loop
-		for entry in f:
+	try:
+		while True:
+			# Retrieve dictionary entry
+			directory, entry = q.get()
+			if entry is None: break
 			entry = entry.rstrip()
+			if entry=="":
+				q.task_done()
+				continue
 
-			if entry == "/" or entry=="": continue
-
+			# Scan wordlist entry with all extensions
 			for ex in ext:
-				# Rotating bar
-				if int(time.time())%5==0:
-					print(l[t], end="\r")
-					t = (t+1)%4
-				# Don't need to scan entry.php/ so we skip it
-				if entry.split(".")[-1] in ext and ex=="/": continue
-				# Prevent flood
-				time.sleep(0.05)
-					
-				if i>UPDATE_THRESHOLD:
-					found += dump_scan(requests)
-					requests.clear()
-					i = 0
+				sid = conn.request("HEAD", directory + urllib.parse.quote_plus(entry) + ex)
+				resp = conn.get_response(sid)
+				results[directory + entry + ex] = resp.status
+				if resp.status==301 or resp.status==302:
+					try: redirections[directory + entry + ex] = resp.headers.get(b"location")[0].decode("utf-8")
+					except TypeError: redirections[directory + entry + ex] = "NULL"
 
-				# Perform request and store stream ID
-				sid = conn.request("HEAD", directory + entry + ex)
-				requests[directory + entry + ex] = sid
-				i += 1
+			# Print results
+			for url, st in results.items():
+				if st!=404:
+					if st==301 or st==302: tail = " -> " + redirections[url]
+					else:
+						tail = ""
+						if url[-1]=="/" and st!=400: output.put(url)
+					print(url + ": " + str(st) + tail)
 
-		found += dump_scan(requests)
+			results.clear()
+			redirections.clear()
+			q.task_done()
+	except Exception as exc: sys.exit(exc)
 
-		# Recursively scan found directories
-		for fd in found:
-			recursive_dirscan(conn, fd, file, ext, rec_level+1, max_rec_level)
+# Recursive threaded scan for a specific directory
+def threaded_scan(conn, directory, file, rec_level, max_rec, nthreads):
 
-if __name__ == "__main__":
+	if rec_level >= max_rec: return
+
+	# Input and output queues work and results for the threads
+	work = queue.Queue(QUEUE_LIMIT)
+	output = queue.Queue(QUEUE_LIMIT)
+
+	# Start threads
+	threads = list()
+	for i in range(nthreads):
+		t = threading.Thread(target=stream_worker, args=(work, conn, output))
+		t.daemon = True
+		t.start()
+		threads.append(t)
+		time.sleep(0.05)
+
+	print("\n[*] Starting scan on " + directory)
+
+	# Put entries to be scanned into work queue
+	with open(file, "r") as f:
+		for entry in f:
+			work.put((directory, entry))
+
+	# Block until the queue is over
+	work.join()
+
+	# Send stop signal to threads
+	for i in range(nthreads):
+		work.put(("", None))
+	for t in threads:
+		t.join()
+
+	# Call recursively with each found directory
+	while not output.empty():
+		fd = output.get()
+		threaded_scan(conn, fd, file, rec_level+1, max_rec, nthreads)
+
+if __name__ == '__main__':
 
 	print("--------------------------------")
 	print("h2buster v" + __version__)
-	print("--------------------------------\n")
-
-	# For benchmarking purposes
-	t0 = time.time()
-
-	# For every entry in the dictionary, every extension will be checked
-	ext = ["/", "",".php", ".html", ".htm", ".asp", ".js", ".css"]
+	print("--------------------------------")
 
 	# Input reading
-	opts = ["w", "u", "r"]
-	mvar = ["wordlist", "target", "recursion_depth"]
-	h = ["Directory wordlist", "Target URL", "Maximum directory recursion depth. Minimum is 1, default is 2."]
-	defaults = [None, None, 2]	# None => argument is required
+	opts = ["w", "u", "r", "t"]
+	mvar = ["wordlist", "target", "directory_depth", "threads"]
+	h = ["Directory wordlist", "Target URL/IP address. Default port is 443 with HTTPS. To specify otherwise, use ':port' or 'http://' (port will default to 80 then).", "Maximum directory depth. Minimum is 1, default is 2.", "Number of threads. Default is 10."]
+	defaults = [None, None, 2, 10]  # None => argument is required
 	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
 
 	try:
-
 		# Input checking
-		args.r = int(args.r)
-		if args.r<1:
-			sys.exit("[-] Recursion depth must be greater than 1.")
+		try:
+			args.r = int(args.r)
+			args.t = int(args.t)
+			if args.t<1 or args.r<1:
+				sys.exit("\n[-] threads and recursion_depth must be greater than zero.")
+		except ValueError:
+			sys.exit("\n[-] Invalid non-numerical option introduced.")
 
-		# Check HTTP/HTTPS and start connection
-		s, ip = check_tls(args.u)
-		conn = h2_connect(ip, s)
-		print("[*] Starting scan on " + ip)
-		print("[*] recursion_depth = " + str(args.r))
+		# For benchmarking purposes
+		t0 = time.time()
 
-		# Main function
-		recursive_dirscan(conn, "/", args.w, ext, 0, args.r)
+		# Check wheter we should use HTTP or HTTPS and start connection
+		ip, s = check_tls(args.u)
+		conn, port = h2_connect(ip, s)
+
+		print("[+] Connected to " + ip + " on port " + str(port))
+		if s==1: print("[*] TLS is ON")
+		else: print(" [*] TLS is OFF")
+		print("[*] Number of threads: " + str(args.t))
+		print("[*] Directory depth: " + str(args.r))
+
+		# Start threaded scan. This will call itself recursively with found directories args.r-1 times
+		try: threaded_scan(conn, "/", args.w, 0, args.r, args.t)
+		except Exception as exc: sys.exit(exc)
+
 		conn.close()
 
 		print(" \n[*] Program ran in " + str(round(time.time()-t0, 3)) + " seconds.")
-
-	except ValueError:
-		print("[-] Recursion depth must be a numeric value.")
-
-	except OSError as ose:
-		print(ose)
-
-	except FileNotFoundError:
-		print("[-] File not found.")
-
-	except AssertionError:
-		print("[-] That target does not support HTTP/2.")
 
 	except KeyboardInterrupt:
 		conn.close()

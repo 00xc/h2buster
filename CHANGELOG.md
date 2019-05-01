@@ -1,5 +1,9 @@
 # Changelog #
 
+## 0.2 ##
+* Added multithreading with option `-t`.
+* Updated target port infering logic based on input (will default to port 443 unless "http://" or ":80" are present).
+
 ## 0.1d ##
 * Changed CLI inputs from positional to optional arguments.
 * Added `maximum_recursion` as an option (`-r`).
