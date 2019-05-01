@@ -1,12 +1,12 @@
 # h2buster
-A recursive web directory brute-force scanner over HTTP/2 using [hyper](https://github.com/Lukasa/hyper).\
+A recursive web directory brute-force scanner over HTTP/2 using [hyper](https://github.com/Lukasa/hyper), inspired by [Gobuster](https://github.com/OJ/gobuster).\
 \
 Check the [TODO](TODO.md) file for contributing.
 
 ## Usage
 
 ```
-usage: h2buster.py [-h] -w wordlist -u target [-r recursion_depth] [-t threads]
+usage: python3 h2buster.py [-h] -w wordlist -u target [-r recursion_depth] [-t threads]
 
 arguments:
   -h, --help          show this help message and exit
