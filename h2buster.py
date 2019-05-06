@@ -168,7 +168,7 @@ if __name__ == '__main__':
 
 		print("[+] Connected to " + ip + " on port " + str(port))
 		if s==1: print("[*] TLS is ON")
-		else: print(" [*] TLS is OFF")
+		else: print("[*] TLS is OFF")
 		print("[*] Number of threads: " + str(args.t))
 		print("[*] Directory depth: " + str(args.r))
 
