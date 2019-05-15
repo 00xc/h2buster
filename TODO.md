@@ -14,8 +14,11 @@
 	- Configurable time between requests to avoid flooding.
 	- Require valid certificates.
 	- HTML parsing for web crawling (might slow things down a lot).
+* Add colors based on response code.
+* Clean up information displayed at the start of the program. 
 
 ## Other ideas/possible updates ##
 * Make the search breadth-first.
 * Add support for HTTP/1.
 * Test [aioh2](https://github.com/decentfox/aioh2) for speed comparison.
+* Add a custom 404 page content, so that sites that reply with a 200 code but display a "not found page" can be filtered. 
