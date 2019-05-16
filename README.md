@@ -4,7 +4,7 @@ A recursive web directory brute-force scanner over HTTP/2 using [hyper](https://
 Check the [TODO](TODO.md) file for contributing.
 
 ## Features ##
-* Fast and portable - no installation needed.
+* Fast and portable - just one file, no installation needed.
 * Multiconnection scanning.
 * Multithreaded connections.
 * Scalable: scans can be as docile or aggressive as you configure them to be.
