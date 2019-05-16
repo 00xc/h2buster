@@ -6,14 +6,16 @@ Check the [TODO](TODO.md) file for contributing.
 ## Usage
 
 ```
-usage: python3 h2buster.py [-h] -w wordlist -u target [-r recursion_depth] [-t threads]
+usage: h2buster_2a.py [-h] -w wordlist -u target [-r directory_depth]
+                      [-c connections] [-t threads]
 
 arguments:
   -h, --help          show this help message and exit
   -w wordlist         Directory wordlist
-  -u target           Target URL/IP address. Default port is 443 with HTTPS.
-                      To specify otherwise, use ':port' or 'http://' (port
-                      will default to 80 then).
-  -r directory_depth  Maximum directory depth. Minimum is 1, default is 2.
-  -t threads          Number of threads. Default is 10.
+  -u target           Target URL/IP address. Default port is 443 and HTTPS
+                      enabled. To specify otherwise, use ':port' or 'http://'
+                      (port will default to 80 then).
+  -r directory_depth  Maximum recursive directory depth. Minimum is 1, default is 2.
+  -c connections      Number of HTTP/2 connections. Default is 3.
+  -t threads          Number of threads per connection. Default is 15.
 ```

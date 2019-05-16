@@ -1,5 +1,13 @@
 # Changelog #
 
+## 0.3 ##
+* Added multiprocessing. Each process handles its own HTTP/2 connection. Number of connections can be specified with `-c`. This should greatly improve speed.
+* Improved target URL parsing. Scan can now start from a different directory than the root web directory. Use it as: `-u target_ip/starting_directory`
+* Changed default threads from 10 to 15.
+* Information printed at the start of the program is more complete and verbose.
+* Added a small dumb dictionary to perform light tests at `/test/small.txt`.
+* Cleaned up code: default values and help text are declared as constants at the beginning of the program.
+
 ## 0.2 ##
 * Added multithreading with option `-t`.
 * Updated target port infering logic based on input (will default to port 443 unless `http://` or `:80` are present).
