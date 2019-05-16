@@ -12,7 +12,7 @@ Check the [TODO](TODO.md) file for contributing.
 * Configurable directory recursion depth.
 
 ## Install ##
-You only need to install one dependency. If you don't have hyper, run:
+You only need to install one dependency. If you don't have hyper, run:\
 `pip install -r requirements.txt`
 
 ## Usage
