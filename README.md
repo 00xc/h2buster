@@ -6,7 +6,7 @@ Check the [TODO](TODO.md) file for contributing.
 ## Usage
 
 ```
-usage: h2buster_2a.py [-h] -w wordlist -u target [-r directory_depth]
+usage: h2buster.py [-h] -w wordlist -u target [-r directory_depth]
                       [-c connections] [-t threads]
 
 arguments:
