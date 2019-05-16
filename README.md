@@ -13,7 +13,7 @@ Check the [TODO](TODO.md) file for contributing.
 
 ## Install ##
 You only need to install one dependency. If you don't have [hyper](https://github.com/Lukasa/hyper), run:\
-`pip install -r requirements.txt`
+`pip3 install -r requirements.txt`
 
 ## Usage
 ```
