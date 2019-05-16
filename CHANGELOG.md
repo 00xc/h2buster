@@ -1,5 +1,9 @@
 # Changelog #
 
+## 0.3a ##
+* Fixed option checking for number of connections (`-c`) for values less than 1.
+* Now if `directory_depth` (`-r`) is zero, there is no limit to directory recursion.
+
 ## 0.3 ##
 * Added multiprocessing. Each process handles its own HTTP/2 connection. Number of connections can be specified with `-c`. This should greatly improve speed.
 * Improved target URL parsing. Scan can now start from a different directory than the root web directory. Use it as: `-u target_ip/starting_directory`

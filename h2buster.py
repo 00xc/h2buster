@@ -1,12 +1,11 @@
 import hyper
 import threading, queue
 import ssl, sys, time, argparse
-import urllib.parse
 import multiprocessing
 
 # Metadata variables, program constants and global variables.
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3"
+__version__ = "0.3a"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
@@ -25,7 +24,7 @@ THREADS_DEFAULT = 15
 
 WORDLIST_HELP = "Directory wordlist"
 TARGET_HELP = "Target URL/IP address. Default port is 443 and HTTPS enabled. To specify otherwise, use ':port' or 'http://' (port will default to 80 then)."
-DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, default is " + str(DIR_DEPTH_DEFAULT) + "."
+DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, default is " + str(DIR_DEPTH_DEFAULT) + ", unlimited is 0."
 CNX_HELP = "Number of HTTP/2 connections. Default is " + str(CNX_DEFAULT) + "."
 THREADS_HELP = "Number of threads per connection. Default is " + str(THREADS_DEFAULT) + "."
 
@@ -95,7 +94,8 @@ def h2_connect(s, ip):
 # Function: main scan function. Starts up a number of processes which handle their own h2 connection and sends them entries to scan
 def main_scan(s, ip, directory, wordlist, dir_depth, max_depth, connections, threads):
 
-	if dir_depth >= max_depth: return
+	if max_depth!=0:
+		if dir_depth >= max_depth: return
 	global ext
 
 	print("\n[*] Starting scan on " + directory)
@@ -170,7 +170,7 @@ def thread_worker(conn, inwork, output):
 			else:
 				tail = ""
 				if st==200 and entry[-1]=="/": output.append(directory + entry)
-			print(directory+entry + ": " + str(st) + tail)
+			print("".join([directory, entry, ": ", str(st), tail]))
 
 # Main start point. Read, verify inputs and call main_scan()
 if __name__ == '__main__':
@@ -191,8 +191,8 @@ if __name__ == '__main__':
 		args.r = int(args.r)
 		args.c = int(args.c)
 		args.t = int(args.t)
-		if args.t<1 or args.r<1:
-			sys.exit("[-] " + THREADS_MVAR + " and " + DIR_DEPTH_MVAR + " must be greater than zero")
+		if args.t<1 or args.c<1 or args.r<0:
+			sys.exit("[-] " + CNX_MVAR + " and " + THREADS_MVAR + " must be greater than zero. " + DIR_DEPTH_MVAR + " must be greater than or equal to zero.")
 	except ValueError:
 		sys.exit("[-] Invalid non-numerical option introduced")
 

@@ -11,11 +11,13 @@ Check the [TODO](TODO.md) file for contributing.
 * h2 (HTTP/2 over TLS) and h2c (HTTP/2 over plain TCP) support.
 * Configurable directory recursion depth.
 
-## Usage ##
+## Usage
 
 ```
 usage: h2buster.py [-h] -w wordlist -u target [-r directory_depth]
-                      [-c connections] [-t threads]
+                   [-c connections] [-t threads]
+
+h2buster: an HTTP/2 web directory brute-force scanner.
 
 arguments:
   -h, --help          show this help message and exit
@@ -23,7 +25,8 @@ arguments:
   -u target           Target URL/IP address. Default port is 443 and HTTPS
                       enabled. To specify otherwise, use ':port' or 'http://'
                       (port will default to 80 then).
-  -r directory_depth  Maximum recursive directory depth. Minimum is 1, default is 2.
+  -r directory_depth  Maximum recursive directory depth. Minimum is 1, default
+                      is 2, unlimited is 0.
   -c connections      Number of HTTP/2 connections. Default is 3.
   -t threads          Number of threads per connection. Default is 15.
 ```
