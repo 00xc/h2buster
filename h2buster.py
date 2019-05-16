@@ -10,7 +10,6 @@ __version__ = "0.3"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
-DASHLINE_A = "=========================================="
 
 WORDLIST_MVAR = "wordlist"
 TARGET_MVAR = "target"
