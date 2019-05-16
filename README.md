@@ -8,7 +8,7 @@ Check the [TODO](TODO.md) file for contributing.
 * Multiconnection scanning.
 * Multithreaded connections.
 * Scalable: scans can be as docile or aggressive as you configure them to be.
-* h2 (HTTP/2 over TLS) and h2c (HTTP/2 over plain TCP) support.
+* h2 and h2c support.
 * Configurable directory recursion depth.
 
 ## Install ##
