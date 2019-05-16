@@ -3,7 +3,15 @@ A recursive web directory brute-force scanner over HTTP/2 using [hyper](https://
 \
 Check the [TODO](TODO.md) file for contributing.
 
-## Usage
+## Features ##
+* Fast and portable - no installation needed.
+* Multiconnection scanning.
+* Multithreaded connections.
+* Scalable: scans can be as docile or aggressive as you configure them to be.
+* h2 (HTTP/2 over TLS) and h2c (HTTP/2 over plain TCP) support.
+* Configurable directory recursion depth.
+
+## Usage ##
 
 ```
 usage: h2buster.py [-h] -w wordlist -u target [-r directory_depth]
