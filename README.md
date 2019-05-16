@@ -4,7 +4,7 @@ A threaded, recursive, web directory brute-force scanner over HTTP/2 using [hype
 Check the [TODO](TODO.md) file for contributing.
 
 ## Features ##
-* Fast and portable - just one file, no installation needed.
+* Fast and portable - install [hyper](https://github.com/Lukasa/hyper) and run.
 * Multiconnection scanning.
 * Multithreaded connections.
 * Scalable: scans can be as docile or aggressive as you configure them to be.
