@@ -11,8 +11,11 @@ Check the [TODO](TODO.md) file for contributing.
 * h2 (HTTP/2 over TLS) and h2c (HTTP/2 over plain TCP) support.
 * Configurable directory recursion depth.
 
-## Usage
+## Install ##
+You only need to install one dependency. If you don't have hyper, run:
+`pip install -r requirements.txt`
 
+## Usage
 ```
 usage: h2buster.py [-h] -w wordlist -u target [-r directory_depth]
                    [-c connections] [-t threads]
