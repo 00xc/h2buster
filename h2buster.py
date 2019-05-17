@@ -5,7 +5,7 @@ import multiprocessing
 
 # Metadata variables, program constants and global variables.
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3a"
+__version__ = "0.3b"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
