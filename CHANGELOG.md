@@ -1,9 +1,13 @@
 # Changelog #
 
+## 0.3c ##
+* HTTP/2 support on the target is checked before starting scan. If the target is not compatible or resets connection, the program exits more gracefully.
+* Added colors in output (only for Linux and OS X). To disable them, use `-nc`.
+
 ## 0.3b ##
 * Fixed a bug where for some entries in the wordlist would crash the script.
 * Improved directory detection for found entries:
-	- Some found URLs ending in `/` are no longer classified as directories (such as `/index.php/`)
+	- Some found URLs ending in `/` are no longer classified as directories (such as `/index.php/`).
 	- URLs ending in `//` are no longer considered directories.
 
 ## 0.3a ##

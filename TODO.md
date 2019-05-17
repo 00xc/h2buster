@@ -14,7 +14,6 @@
 	- Configurable time between requests to avoid flooding.
 	- Require valid certificates.
 	- HTML parsing for web crawling (might slow things down a lot).
-* Add colors based on response code.
 
 ## Other ideas/possible updates ##
 * Make the search breadth-first.

@@ -1,7 +1,5 @@
-# h2buster
-A threaded, recursive, web directory brute-force scanner over HTTP/2 using [hyper](https://github.com/Lukasa/hyper), inspired by [Gobuster](https://github.com/OJ/gobuster).\
-\
-Check the [TODO](TODO.md) file for contributing.
+# h2buster (v0.3c) #
+A threaded, recursive, web directory brute-force scanner over HTTP/2 using [hyper](https://github.com/Lukasa/hyper), inspired by [Gobuster](https://github.com/OJ/gobuster).
 
 ## Features ##
 * Fast and portable - install [hyper](https://github.com/Lukasa/hyper) and run.
@@ -18,7 +16,7 @@ You only need to install one dependency. If you don't have [hyper](https://githu
 ## Usage
 ```
 usage: h2buster.py [-h] -w wordlist -u target [-r directory_depth]
-                   [-c connections] [-t threads]
+                   [-c connections] [-t threads] [-nc]
 
 h2buster: an HTTP/2 web directory brute-force scanner.
 
@@ -32,4 +30,9 @@ arguments:
                       is 2, unlimited is 0.
   -c connections      Number of HTTP/2 connections. Default is 3.
   -t threads          Number of threads per connection. Default is 15.
+  -nc                 Disable colored output text.
 ```
+
+## Contributing ##
+
+Check the [TODO](TODO.md) file for a list of features that need work.
