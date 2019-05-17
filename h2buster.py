@@ -38,6 +38,20 @@ def timestamp(t0):
 	t = str(round(time.time() - t0, TIMESTAMP_ROUND))
 	return t
 
+# Function: return True if entry is a directory, False otherwise.
+def isdir(e):
+	if e == "/": return False
+
+	if len(e)>0 and e[-1]=="/":
+		if e.count(".") > 0:
+			if any([len(x)==0 for x in e.split(".")]):
+				return True
+			else:
+				return False
+		else: return True
+	else:
+		return False
+
 # Function: read "opts" options from command line interface
 def read_inputs(info, opts, h, defaults, mvar):
 	parser = argparse.ArgumentParser(description=info)
@@ -158,7 +172,7 @@ def thread_worker(conn, inwork, output):
 	while True:
 		directory, entry = inwork.get()
 		if entry is None: break
-		
+
 		sid = conn.request("HEAD", directory + entry.replace(" ", "%20"))
 		resp = conn.get_response(sid)
 
@@ -169,7 +183,8 @@ def thread_worker(conn, inwork, output):
 			if st==301 or st==302: tail = " -> " + headers.get(b"location")[0].decode("utf-8")
 			else:
 				tail = ""
-				if st==200 and entry[-1]=="/": output.append(directory + entry)
+				if st==200 and isdir(entry):
+					output.append(directory + entry)
 			print("".join([directory, entry, ": ", str(st), tail]))
 
 # Main start point. Read, verify inputs and call main_scan()

@@ -1,5 +1,11 @@
 # Changelog #
 
+## 0.3b ##
+* Fixed a bug where for some entries in the wordlist would crash the script.
+* Improved directory detection for found entries:
+	- Some found URLs ending in `/` are no longer classified as directories (such as `/index.php/`)
+	- URLs ending in `//` are no longer considered directories.
+
 ## 0.3a ##
 * Added multiprocessing. Each process handles its own HTTP/2 connection. Number of connections can be specified with `-c`. This should greatly improve speed.
 * Improved target URL parsing. Scan can now start from a different directory than the root web directory. Use it as: `-u target_ip/starting_directory`.
