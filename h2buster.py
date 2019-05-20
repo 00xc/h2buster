@@ -245,7 +245,7 @@ if __name__ == '__main__':
 
 	# Set NOCOLOR as global constant so colorstring() knows what to do
 	if platform.system() != "Windows":
-		NOCOLOR = args.wc
+		NOCOLOR = args.nc
 	else:
 		NOCOLOR = True
 
