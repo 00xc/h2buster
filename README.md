@@ -1,4 +1,4 @@
-# h2buster (v0.3c) #
+# h2buster (v0.3c-1) #
 A threaded, recursive, web directory brute-force scanner over HTTP/2 using [hyper](https://github.com/Lukasa/hyper), inspired by [Gobuster](https://github.com/OJ/gobuster).
 
 ## Features ##

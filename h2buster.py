@@ -6,7 +6,7 @@ import platform
 
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3c"
+__version__ = "0.3c-1"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
@@ -43,7 +43,7 @@ NOCOLOR_HELP = "Disable colored output text."
 TIMESTAMP_ROUND = 3
 TLS_DEFAULT = 1
 
-# Define colors (only Linux)
+# Define colors (only Linux and OS X)
 if platform.system() == "Linux" or platform.system() == "Darwin":
 	COLOR_200 = '\033[92m' # green
 	COLOR_302 = '\033[94m' # blue
@@ -55,7 +55,11 @@ if platform.system() == "Linux" or platform.system() == "Darwin":
 # Function: returns colored string according to status
 def colorstring(s, status=0):
 	global NOCOLOR
-	if status == 0 or NOCOLOR==True: return s
+	try:
+		if status == 0 or NOCOLOR==True:
+			return s
+	except NameError:
+		return s
 	if platform.system() == "Linux":
 		try:
 			start = globals()["COLOR_" + str(status)]
@@ -238,10 +242,12 @@ if __name__ == '__main__':
 	h = [WORDLIST_HELP, TARGET_HELP, DIR_DEPTH_HELP, CNX_HELP, THREADS_HELP, NOCOLOR_HELP]
 	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, DIR_DEPTH_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, NOCOLOR_DEFAULT]
 	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
-	
-	# Set nc as global constant so we don't have to pass it around for every function that prints text.
-	# It's hacky, but whatever.
-	NOCOLOR = args.nc
+
+	# Set NOCOLOR as global constant so colorstring() knows what to do
+	if platform.system() != "Windows":
+		NOCOLOR = args.wc
+	else:
+		NOCOLOR = True
 
 	# Input checking
 	try:

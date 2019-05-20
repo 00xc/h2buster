@@ -1,5 +1,9 @@
 # Changelog #
 
+## 0.3c-1 ##
+* Fixed a bug where not using `-wc` on Windows would crash the program.
+* Fixed a bug where found directories with a space on them would not be properly URL encoded when scanning them.
+
 ## 0.3c ##
 * HTTP/2 support on the target is checked before starting scan. If the target is not compatible or resets connection, the program exits more gracefully.
 * Added colors in output (only for Linux and OS X). To disable them, use `-nc`.
@@ -13,7 +17,7 @@
 ## 0.3a ##
 * Added multiprocessing. Each process handles its own HTTP/2 connection. Number of connections can be specified with `-c`. This should greatly improve speed.
 * Improved target URL parsing. Scan can now start from a different directory than the root web directory. Use it as: `-u target_ip/starting_directory`.
-* Now if `directory_depth` (`-r`) is zero, there is no limit to directory recursion.
+* Now if `directory_depth` (`-r`) (previously known as `maximum_recursion`) is zero, there is no limit to directory recursion.
 * Changed default threads from 10 to 15.
 * Information printed at the start of the program is more complete and verbose.
 * Added a small dumb dictionary to perform light tests at `/test/small.txt`.
