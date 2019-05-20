@@ -9,6 +9,8 @@ A threaded, recursive, web directory brute-force scanner over HTTP/2 using [hype
 * h2 and h2c support.
 * Configurable directory recursion depth.
 
+![h2b](https://imgur.com/a/hrb1gCm)
+
 ## Install ##
 You only need to install one dependency. If you don't have [hyper](https://github.com/Lukasa/hyper), run:\
 `pip3 install -r requirements.txt`
@@ -34,5 +36,4 @@ arguments:
 ```
 
 ## Contributing ##
-
 Check the [TODO](TODO.md) file for a list of features that need work.
