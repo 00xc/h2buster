@@ -9,7 +9,7 @@ A threaded, recursive, web directory brute-force scanner over HTTP/2 using [hype
 * h2 and h2c support.
 * Configurable directory recursion depth.
 
-![h2b](https://imgur.com/a/hrb1gCm)
+![h2b](https://i.imgur.com/WuSHuxR.png)
 
 ## Install ##
 You only need to install one dependency. If you don't have [hyper](https://github.com/Lukasa/hyper), run:\
