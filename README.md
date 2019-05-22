@@ -17,7 +17,7 @@ You only need to install one dependency. If you don't have [hyper](https://githu
 ## Usage
 ```
 usage: h2buster.py [-h] -w wordlist -u target [-r directory_depth]
-                   [-c connections] [-t threads] [-nc]
+                   [-c connections] [-t threads] [-nc] [-x extension_list]
 
 h2buster: an HTTP/2 web directory brute-force scanner.
 
