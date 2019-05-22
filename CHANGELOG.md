@@ -1,5 +1,13 @@
 # Changelog #
 
+## 0.3d ##
+* A list of extensions can be given to be scanned, separated by a semicolon, with `-x`. For example, `-x '.php;.js;blank;/'` will check for .php, .js, blank and / file endings. Note that the `blank` keyword is used to signify no file ending.
+* Improved target parsing (`-u`).
+* Added feedback on stdout to see current entry being scanned (only on Linux and OS X).
+* Changed default threads (`-t`) from 15 to 20.
+* Improved color printing performance. The program should run smoother on both UNIX-based and Windows.
+* Other very slight performance improvements.
+
 ## 0.3c-1 ##
 * Fixed a bug where not using `-wc` on Windows would crash the program.
 * Fixed a bug where found directories with a space on them would not be properly URL encoded when scanning them.
