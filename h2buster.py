@@ -234,7 +234,7 @@ def thread_worker(conn, inwork, output):
 		# Feedback on the last line of stdout
 		print(colorstring(entry, status=0), end="\r")
 
-		sid = conn.request("GET", directory + entry.replace(" ", "%20"))
+		sid = conn.request("HEAD", directory + entry.replace(" ", "%20"))
 		try: resp = conn.get_response(sid)
 		except hyper.http20.exceptions.StreamResetError:
 			print(colorstring("[-] Warning: stream reset", status="403"))
