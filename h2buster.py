@@ -2,10 +2,12 @@ import hyper
 import threading, queue, multiprocessing
 import ssl, sys, time, argparse
 import platform
+from socket import gaierror
+from ssl import SSLError
 
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3d"
+__version__ = "0.3d-1"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
@@ -160,10 +162,7 @@ def h2_connect(s, ip, port):
 		conn = hyper.HTTP20Connection(ip, port=port, ssl_context=ctx, enable_push=False)
 	elif s == TLS_OFF:
 		conn = hyper.HTTP20Connection(ip, port=port, enable_push=False)
-	try: conn.connect()
-	except AssertionError:
-		conn.close()
-		sys.exit(colorstring("[-] H2 not supported for that target.", status="ERROR"))
+	conn.connect()
 	return conn
 
 # Function: main scan function. Starts up a number of processes which handle their own h2 connection and sends them entries to scan
@@ -267,8 +266,8 @@ if __name__ == '__main__':
 	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
 
 	# Set NOCOLOR as global constant so colorstring() knows what to do
-	if platform.system() != "Windows": NOCOLOR = args.nc
-	else: NOCOLOR = True
+	if platform.system() == "Linux" or platform.system() == "Darwin":
+		NOCOLOR = args.nc
 
 	# Input checking
 	try:
@@ -289,15 +288,22 @@ if __name__ == '__main__':
 	# Parse target URL
 	s, ip, port, start_dir = parse_target(args.u)
 
-	# Check if target accepts requests and supports H2.
-	conn = h2_connect(s, ip, port)
+	# Check if target is valid
 	try:
-		sid = conn.request("HEAD", "/")
+		conn = h2_connect(s, ip, port)
+		sid = conn.request("HEAD", start_dir)
 		resp = conn.get_response(sid)
 	except ConnectionResetError:
-		sys.exit(colorstring("[-] Connection reset. Are you sure target supports HTTP/2?", status="ERROR"))
-	finally:
 		conn.close()
+		sys.exit(colorstring("[-] Connection reset. Are you sure the target supports HTTP/2?", status="ERROR"))
+	except AssertionError:
+		sys.exit(colorstring("[-] HTTP/2 not supported for that target.", status="ERROR"))
+	except gaierror:
+		sys.exit(colorstring("[-] Could not get address information. Are you sure the target exists?", status="ERROR"))
+	except SSLError:
+		sys.exit(colorstring("[-] Unkown TLS error.", status="ERROR"))
+
+	conn.close()
 	print(colorstring("[+] Target supports HTTP/2", status=200))
 
 	# Print info

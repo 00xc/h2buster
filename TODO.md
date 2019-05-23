@@ -1,5 +1,4 @@
 ## Planned features/future updates ##
-* Improve error handling (right now it is sort of ugly when something breaks).
 * Indicate response codes for redirection targets. Maybe add this as an option as it could slow things down. The same connection could be reused to do this if certain rules are met for the redirection location ([HTTP/2 coalescing](https://daniel.haxx.se/blog/2016/08/18/http2-connection-coalescing/))
 * Check if a found directory is listable before scanning it. [dirb](https://gitlab.com/kalilinux/packages/dirb/) does this accurately, perhaps ideas can be taken from there.
 * Add command line options for more functionality. Some ideas:

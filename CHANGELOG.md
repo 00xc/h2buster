@@ -1,5 +1,8 @@
 # Changelog #
 
+## 0.3d-1 ##
+* Improved error handling for reset connections, HTTP/1-only targets, targets that do not exist and TLS errors.
+
 ## 0.3d ##
 * A list of extensions can be given to be scanned, separated by a semicolon, with `-x`. For example, `-x '.php;.js;blank;/'` will check for .php, .js, blank and / file endings. Note that the `blank` keyword is used to signify no file ending.
 * Improved target parsing (`-u`).
