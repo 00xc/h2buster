@@ -1,5 +1,10 @@
 # Changelog #
 
+## 0.3e ##
+* A list of headers can be given to be sent for each request with `-hd` with the format `-hd 'header->value[|header->value|header->value...]'`. For example: `-hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'`.
+* Extensions are now separated by a vertical bar too (`|`) for consistency (e.g. `-x '.php|.js|blank|/'`).
+* The `server` header of the first response is now displayed at the beginning of the scan (if there is one).
+
 ## 0.3d-1 ##
 * Improved error handling for reset connections, HTTP/1-only targets, targets that do not exist and TLS errors.
 

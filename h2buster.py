@@ -7,7 +7,7 @@ from ssl import SSLError
 
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3d-1"
+__version__ = "0.3e"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
@@ -20,6 +20,7 @@ CNX_MVAR = "connections"
 THREADS_MVAR = "threads"
 NOCOLOR_MVAR = ""
 EXT_MVAR = "extension_list"
+HEADERS_MVAR = "header_list"
 
 # CLI options default values.
 # None means required. Boolean means that the option has no argument (either the flag is there or not)
@@ -29,7 +30,8 @@ DIR_DEPTH_DEFAULT = 2
 CNX_DEFAULT = 3
 THREADS_DEFAULT = 20
 NOCOLOR_DEFAULT = False
-EXT_DEFAULT = "/;blank;.html;.php"
+EXT_DEFAULT = "/|blank|.html|.php"
+HEADERS_DEFAULT = "user-agent->Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/74.0.3729.169 Chrome/74.0.3729.169 Safari/537.36"
 
 # CLI options help strings
 WORDLIST_HELP = "Directory wordlist"
@@ -38,7 +40,8 @@ DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, default is " 
 CNX_HELP = "Number of HTTP/2 connections. Default is " + str(CNX_DEFAULT) + "."
 THREADS_HELP = "Number of threads per connection. Default is " + str(THREADS_DEFAULT) + "."
 NOCOLOR_HELP = "Disable colored output text."
-EXT_HELP = "List of file extensions to check separated by a semicolon. For example, -x '.php;.js;blank;/' will check .php, .js, blank and / for every wordlist entry. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split(";")])
+EXT_HELP = "List of file extensions to check separated by a vertical bar. For example, -x '.php|.js|blank|/' will check .php, .js, blank and / for every wordlist entry. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split("|")])
+HEADERS_HELP = "List of headers in the format 'header->value[|header->value|header->value...]'. For example: -hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'."
 
 # Other hardcoded values
 TIMESTAMP_ROUND = 3
@@ -55,6 +58,7 @@ if platform.system() == "Linux" or platform.system() == "Darwin":
 	COLOR_403 = '\033[93m' # yellow
 	COLOR_ERROR = '\033[91m' # red
 	COLOR_END = '\033[0m' # end color
+	COLOR_BOLD = '\033[1m' # bold
 
 	# Function: return line with colors according to status code
 	def colorstring(s, status=0, overwrite=False):
@@ -143,7 +147,8 @@ def parse_target(target):
 		try:
 			ip, port = tup.split(":", 1)
 			port = int(port)
-		except ValueError: sys.exit(colorstring("[-] Invalid URL", status="ERROR"))
+		except ValueError:
+			sys.exit(colorstring("[-] Invalid URL", status="ERROR"))
 		if port == 80 and target[0]!="https":
 			s = TLS_OFF
 		else:
@@ -153,7 +158,20 @@ def parse_target(target):
 
 	return s, ip, port, directory
 
-# Function: connect via H2 to specified IP[:port]
+# Function: parse input headers
+def parse_header_opt(hd):
+	try:
+		hd = hd.split("|")
+		out = dict()
+		for e in hd:
+			if len(e)<4: continue
+			h, v = e.split("->", 1)
+			out[h] = v
+		return out
+	except ValueError:
+		sys.exit(colorstring("[-] Invalid " + HEADERS_MVAR + " value.", status="ERROR"))
+
+# Function: connect via H2 to specified IP[:port] and return connection object
 def h2_connect(s, ip, port):
 	if s == TLS_ON:
 		ctx = ssl.SSLContext()
@@ -181,7 +199,7 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 	# Start connections
 	pool = list()
 	for i in range(args.c):
-		p = multiprocessing.Process(target=process_worker, args=(s, ip, port, args.t, inwork, output))
+		p = multiprocessing.Process(target=process_worker, args=(s, ip, port, args.t, args.hd, inwork, output))
 		p.daemon = True
 		p.start()
 		pool.append(p)
@@ -211,12 +229,12 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 		main_scan(s, ip, port, d, args, dir_depth+1)
 
 # Function: process worker. Starts a connection and a number of threads that perform requests on that connection.
-def process_worker(s, ip, port, threads, inwork, output):
+def process_worker(s, ip, port, threads, head, inwork, output):
 	conn = h2_connect(s, ip, port)
 
 	threadpool = list()
 	for i in range(threads):
-		t = threading.Thread(target=thread_worker, args=(conn, inwork, output))
+		t = threading.Thread(target=thread_worker, args=(conn, head, inwork, output))
 		t.daemon = True
 		t.start()
 		threadpool.append(t)
@@ -225,7 +243,7 @@ def process_worker(s, ip, port, threads, inwork, output):
 	conn.close()
 
 # Function: thread worker. For each entry in the inwork queue, sends one request and reads response status code
-def thread_worker(conn, inwork, output):
+def thread_worker(conn, head, inwork, output):
 	while True:
 		directory, entry = inwork.get()
 		if entry is None: break
@@ -233,7 +251,7 @@ def thread_worker(conn, inwork, output):
 		# Feedback on the last line of stdout
 		print(colorstring(entry, status=0), end="\r")
 
-		sid = conn.request("HEAD", directory + entry.replace(" ", "%20"))
+		sid = conn.request("HEAD", directory + entry.replace(" ", "%20"), headers=head)
 		try: resp = conn.get_response(sid)
 		except hyper.http20.exceptions.StreamResetError:
 			print(colorstring("[-] Warning: stream reset", status="403"))
@@ -259,10 +277,10 @@ if __name__ == '__main__':
 	print(DASHLINE)
 
 	# Read CLI inputs
-	opts = ["w", "u", "r", "c", "t", "nc", "x"]
-	mvar = [WORDLIST_MVAR, TARGET_MVAR, DIR_DEPTH_MVAR, CNX_MVAR, THREADS_MVAR, NOCOLOR_MVAR, EXT_MVAR]
-	h = [WORDLIST_HELP, TARGET_HELP, DIR_DEPTH_HELP, CNX_HELP, THREADS_HELP, NOCOLOR_HELP, EXT_HELP]
-	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, DIR_DEPTH_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, NOCOLOR_DEFAULT, EXT_DEFAULT]
+	opts = ["w", "u", "c", "t", "r", "hd", "x", "nc"]
+	mvar = [WORDLIST_MVAR, TARGET_MVAR, CNX_MVAR, THREADS_MVAR, DIR_DEPTH_MVAR, HEADERS_MVAR, EXT_MVAR, NOCOLOR_MVAR]
+	h = [WORDLIST_HELP, TARGET_HELP, CNX_HELP, THREADS_HELP, DIR_DEPTH_HELP, HEADERS_HELP, EXT_HELP, NOCOLOR_HELP]
+	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, DIR_DEPTH_DEFAULT, HEADERS_DEFAULT, EXT_DEFAULT, NOCOLOR_DEFAULT]
 	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
 
 	# Set NOCOLOR as global constant so colorstring() knows what to do
@@ -280,7 +298,10 @@ if __name__ == '__main__':
 		sys.exit(colorstring("[-] Invalid non-numerical option introduced", status="ERROR"))
 
 	# Parse file extensions
-	args.x = list(set(args.x.replace("blank", "").split(";")))
+	args.x = list(set(args.x.replace("blank", "").split("|")))
+
+	# Parse headers
+	args.hd = parse_header_opt(args.hd)
 
 	# Start timer (for benchmarking purposes)
 	t0 = time.time()
@@ -293,6 +314,8 @@ if __name__ == '__main__':
 		conn = h2_connect(s, ip, port)
 		sid = conn.request("HEAD", start_dir)
 		resp = conn.get_response(sid)
+		try: server = resp.headers.get(b"server")[0].decode("utf-8")
+		except TypeError: server = False
 	except ConnectionResetError:
 		conn.close()
 		sys.exit(colorstring("[-] Connection reset. Are you sure the target supports HTTP/2?", status="ERROR"))
@@ -305,14 +328,18 @@ if __name__ == '__main__':
 
 	conn.close()
 	print(colorstring("[+] Target supports HTTP/2", status=200))
+	if server: print(colorstring("[+] Target server: " + server, status=200))
 
 	# Print info
-	print("[*] Initializing scan on " + ip)
+	print("[*] Initializing scan on " + colorstring(ip, status="BOLD"))
 	if s==TLS_ON: print("[*] TLS is ON")
-	else: print("[*] TLS is OFF\n")
+	else: print("[*] TLS is OFF")
 	print("[*] Base directory: " + start_dir)
 	print("[*] Maximum directory depth: " + str(args.r) + " (base directory is depth 1)")
-	print("[*] Checking for file extensions: " + ", ".join(["'"+ex+"'" for ex in args.x]))
+	print("[*] File extensions: " + ", ".join(["'"+ex+"'" for ex in args.x]))
+	print("[*] Headers:")
+	for k, e in args.hd.items():
+		print("\t" + k + ": " + e)
 	print("[*] Number of connections: " + str(args.c))
 	print("[*] Number of threads per connection: " + str(args.t))
 	print(DASHLINE)

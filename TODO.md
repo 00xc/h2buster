@@ -4,10 +4,8 @@
 * Add command line options for more functionality. Some ideas:
 	- Subdomain scanning.
 	- Optional ignored response codes (right now 404 is hardcoded).
-	- User-Agent string and other custom headers (`header:value`)
 	- HTTP basic auth.
 	- Proxy usage.
-	- Server header detection.
 	- Configurable time between requests in the same connection to avoid flooding.
 	- Require valid certificates.
 	- HTML parsing for web crawling (might slow things down a lot).
