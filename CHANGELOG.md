@@ -1,5 +1,8 @@
 # Changelog #
 
+## 0.3e-1 ##
+* Improved error handling for non-RFC-compliant HTTP/2 servers.
+
 ## 0.3e ##
 * A list of headers can be given to be sent for each request with `-hd` with the format `-hd 'header->value[|header->value|header->value...]'`. For example: `-hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'`.
 * Extensions are now separated by a vertical bar too (`|`) for consistency (e.g. `-x '.php|.js|blank|/'`).

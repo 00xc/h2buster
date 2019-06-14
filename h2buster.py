@@ -4,10 +4,11 @@ import ssl, sys, time, argparse
 import platform
 from socket import gaierror
 from ssl import SSLError
+from h2.exceptions import ProtocolError
 
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3e"
+__version__ = "0.3e-1"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
@@ -55,6 +56,7 @@ if platform.system() == "Linux" or platform.system() == "Darwin":
 	COLOR_301 = '\033[94m' # blue
 	COLOR_302 = '\033[94m' # blue
 	COLOR_303 = '\033[94m' # blue
+	COLOR_400 = '\033[91m' # red
 	COLOR_403 = '\033[93m' # yellow
 	COLOR_ERROR = '\033[91m' # red
 	COLOR_END = '\033[0m' # end color
@@ -208,6 +210,7 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 	try:
 		with open(args.w, "r") as f:
 			for entry in f:
+				if entry[0]=="#": continue
 				entry = entry.rstrip()
 				for ex in args.x:
 					inwork.put((directory, entry+ex))
@@ -297,10 +300,8 @@ if __name__ == '__main__':
 	except ValueError:
 		sys.exit(colorstring("[-] Invalid non-numerical option introduced", status="ERROR"))
 
-	# Parse file extensions
+	# Parse file extensions and headers
 	args.x = list(set(args.x.replace("blank", "").split("|")))
-
-	# Parse headers
 	args.hd = parse_header_opt(args.hd)
 
 	# Start timer (for benchmarking purposes)
@@ -314,8 +315,10 @@ if __name__ == '__main__':
 		conn = h2_connect(s, ip, port)
 		sid = conn.request("HEAD", start_dir)
 		resp = conn.get_response(sid)
-		try: server = resp.headers.get(b"server")[0].decode("utf-8")
-		except TypeError: server = False
+		try:
+			server = resp.headers.get(b"server")[0].decode("utf-8")
+		except TypeError:
+			server = False
 	except ConnectionResetError:
 		conn.close()
 		sys.exit(colorstring("[-] Connection reset. Are you sure the target supports HTTP/2?", status="ERROR"))
@@ -325,6 +328,10 @@ if __name__ == '__main__':
 		sys.exit(colorstring("[-] Could not get address information. Are you sure the target exists?", status="ERROR"))
 	except SSLError:
 		sys.exit(colorstring("[-] Unkown TLS error.", status="ERROR"))
+	except ProtocolError as e:
+		sys.exit(colorstring("[-] Protocol compliance error:\n" + str(e), status="ERROR"))
+	except ConnectionRefusedError:
+		sys.exit(colorstring("[-] Connection refused.", status="ERROR"))
 
 	conn.close()
 	print(colorstring("[+] Target supports HTTP/2", status=200))
@@ -344,7 +351,7 @@ if __name__ == '__main__':
 	print("[*] Number of threads per connection: " + str(args.t))
 	print(DASHLINE)
 
-	# Start main scan which will call itself for each found directory
+	# Start recursive scan
 	main_scan(s, ip, port, start_dir, args, 0)
 
 	print(colorstring("\n[*] Program ran in " + timestamp(t0) + " seconds", status="INFO"))
