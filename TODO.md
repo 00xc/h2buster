@@ -8,7 +8,6 @@
 	- Proxy usage.
 	- Configurable time between requests in the same connection to avoid flooding.
 	- Require valid certificates.
-	- HTML parsing for web crawling (might slow things down a lot).
 
 ## Other ideas/possible updates ##
 * Test [hyper](https://github.com/Lukasa/hyper)'s window_manager to increase throughput.
@@ -16,3 +15,4 @@
 * Add support for HTTP/1.
 * Test [aioh2](https://github.com/decentfox/aioh2) for speed comparison. Might be difficult to do so with threading/multiprocessing.
 * Add a custom 404 page content, so that sites that reply with a 200 code but display a "not found page" can be filtered. 
+* HTML parsing for web crawling (might slow things down a lot).
