@@ -1,5 +1,13 @@
 # Changelog #
 
+## 0.3e-2 ##
+* Improved error handling:
+	- Now processes exit gracefully when things go wrong in the middle of a scan instead of hanging.
+	- Keyboard interrupt is now less ugly.
+* Changed default connections (`-c`) to 4. This seems to yield a performance improvement in most cases.
+* Changed `--help` text to be tidier.
+* Changed line endings to UNIX-style (in case you were trying to run as `./h2buster.py`).
+
 ## 0.3e-1 ##
 * Improved error handling for non-RFC-compliant HTTP/2 servers.
 

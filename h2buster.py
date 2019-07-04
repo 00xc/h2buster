@@ -1,48 +1,49 @@
+#!/usr/bin/env python3
 import hyper
 import threading, queue, multiprocessing
-import ssl, sys, time, argparse
-import platform
+import ssl, sys, time, argparse, os
+import platform, signal
 from socket import gaierror
 from ssl import SSLError
 from h2.exceptions import ProtocolError
 
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3e-1"
+__version__ = "0.3e-2"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
-
-# CLI options metavariable names
-WORDLIST_MVAR = "wordlist"
-TARGET_MVAR = "target"
-DIR_DEPTH_MVAR = "directory_depth"
-CNX_MVAR = "connections"
-THREADS_MVAR = "threads"
-NOCOLOR_MVAR = ""
-EXT_MVAR = "extension_list"
-HEADERS_MVAR = "header_list"
 
 # CLI options default values.
 # None means required. Boolean means that the option has no argument (either the flag is there or not)
 WORDLIST_DEFAULT = None
 TARGET_DEFAULT = None
 DIR_DEPTH_DEFAULT = 2
-CNX_DEFAULT = 3
+CNX_DEFAULT = 4
 THREADS_DEFAULT = 20
 NOCOLOR_DEFAULT = False
 EXT_DEFAULT = "/|blank|.html|.php"
-HEADERS_DEFAULT = "user-agent->Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/74.0.3729.169 Chrome/74.0.3729.169 Safari/537.36"
+HEADERS_DEFAULT = "user-agent->Mozilla/5.0 (X11; Linux x86_64)"
+
+# CLI options metavariable names
+WORDLIST_MVAR = "wordlist"
+TARGET_MVAR = "target"
+DIR_DEPTH_MVAR = "directory_depth=" + str(DIR_DEPTH_DEFAULT)
+CNX_MVAR = "connections=" + str(CNX_DEFAULT)
+THREADS_MVAR = "threads=" + str(THREADS_DEFAULT)
+NOCOLOR_MVAR = ""
+EXT_MVAR = "extension_list"
+HEADERS_MVAR = "header_list"
 
 # CLI options help strings
 WORDLIST_HELP = "Directory wordlist"
 TARGET_HELP = "Target URL/IP address (host[:port]). Default port is 443 and HTTPS enabled. To specify otherwise, use ':port' or 'http://' (port will default to 80 then)."
-DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, default is " + str(DIR_DEPTH_DEFAULT) + ", unlimited is 0."
-CNX_HELP = "Number of HTTP/2 connections. Default is " + str(CNX_DEFAULT) + "."
-THREADS_HELP = "Number of threads per connection. Default is " + str(THREADS_DEFAULT) + "."
+DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, unlimited is 0."
+CNX_HELP = "Number of HTTP/2 connections."
+THREADS_HELP = "Number of threads per connection."
 NOCOLOR_HELP = "Disable colored output text."
-EXT_HELP = "List of file extensions to check separated by a vertical bar. For example, -x '.php|.js|blank|/' will check .php, .js, blank and / for every wordlist entry. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split("|")])
-HEADERS_HELP = "List of headers in the format 'header->value[|header->value|header->value...]'. For example: -hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'."
+EXT_HELP = "List of file extensions to check separated by a vertical bar. For example, -x '.php|.js|blank|/'. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split("|")])
+HEADERS_HELP = "List of headers in the format 'header->value|header->value...'. For example: -hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'."
 
 # Other hardcoded values
 TIMESTAMP_ROUND = 3
@@ -58,12 +59,13 @@ if platform.system() == "Linux" or platform.system() == "Darwin":
 	COLOR_303 = '\033[94m' # blue
 	COLOR_400 = '\033[91m' # red
 	COLOR_403 = '\033[93m' # yellow
+	COLOR_999 = '\033[91m' # red
 	COLOR_ERROR = '\033[91m' # red
 	COLOR_END = '\033[0m' # end color
 	COLOR_BOLD = '\033[1m' # bold
 
 	# Function: return line with colors according to status code
-	def colorstring(s, status=0, overwrite=False):
+	def colorstring(s, status=0):
 		global NOCOLOR
 		s = "\x1b[K" + s
 		if status==0 or NOCOLOR==True: return s
@@ -88,13 +90,19 @@ else:
 			return ""
 
 # Function: return time since t0
-def timestamp(t0):
+def _timestamp(t0):
 	return str(round(time.time() - t0, TIMESTAMP_ROUND))
+
+# Function: print total running time
+def end(t0, exit_status):
+	if exit_status == 0: print(colorstring(" ".join(["\n[*] Program ran in", _timestamp(t0), "seconds"]), status="INFO"))
+	else: print(colorstring(" ".join(["\n\n[*] Program aborted after", _timestamp(t0), "seconds"]), status="INFO"))
 
 # Function: return True if entry is a directory, False otherwise.
 def isdir(e):
-	if e == "/" or len(e)==0 or e[-1]!="/": return False
-	if e.count(".")==0 or any([len(x)==0 for x in e.split(".")]):
+	if e == "/" or len(e)==0 or e[-1]!="/":
+		return False
+	elif e.count(".")==0 or any([len(x)==0 for x in e.split(".")]):
 		return True
 	else:
 		return False
@@ -163,15 +171,14 @@ def parse_target(target):
 # Function: parse input headers
 def parse_header_opt(hd):
 	try:
-		hd = hd.split("|")
 		out = dict()
-		for e in hd:
-			if len(e)<4: continue
+		if hd[-1] == "|": hd = hd[:-1]
+		for e in hd.split("|"):
 			h, v = e.split("->", 1)
 			out[h] = v
 		return out
 	except ValueError:
-		sys.exit(colorstring("[-] Invalid " + HEADERS_MVAR + " value.", status="ERROR"))
+		sys.exit(colorstring("[-] Invalid header list.", status="ERROR"))
 
 # Function: connect via H2 to specified IP[:port] and return connection object
 def h2_connect(s, ip, port):
@@ -196,57 +203,69 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 	# Start input/output queues
 	manager = multiprocessing.Manager()
 	output = manager.list()
-	inwork = manager.Queue(args.c)
+	inwork = manager.Queue()
 
 	# Start connections
-	pool = list()
+	process_pool = list()
 	for i in range(args.c):
 		p = multiprocessing.Process(target=process_worker, args=(s, ip, port, args.t, args.hd, inwork, output))
 		p.daemon = True
 		p.start()
-		pool.append(p)
+		process_pool.append(p)
 
-	# Put work
 	try:
+		# Put work
 		with open(args.w, "r") as f:
 			for entry in f:
 				if entry[0]=="#": continue
 				entry = entry.rstrip()
 				for ex in args.x:
 					inwork.put((directory, entry+ex))
+
+		# Send kill signals and wait until processes are done
+		for i in range(args.c*args.t):
+			inwork.put((None, None))
+		for p in process_pool: p.join()
+
 	except FileNotFoundError:
 		for i in range(args.c*args.t):
 			inwork.put((None, None))
-		for p in pool: p.join()
+		for p in process_pool: p.join()
 		sys.exit(colorstring("[-] Wordlist file not found.", status="ERROR"))
 
-	# Send kill signals
-	for i in range(args.c*args.t):
-		inwork.put((None, None))
-
-	# Block until processes are done
-	for p in pool: p.join()
+	except KeyboardInterrupt:
+		for p in process_pool: p.terminate()
+		end(t0, 1)
+		sys.exit()
 
 	# Recursive calls with found directories
 	for d in output:
 		main_scan(s, ip, port, d, args, dir_depth+1)
 
-# Function: process worker. Starts a connection and a number of threads that perform requests on that connection.
+# Function: process worker. Starts one connection and a number of threads that perform requests on that connection.
 def process_worker(s, ip, port, threads, head, inwork, output):
+
 	conn = h2_connect(s, ip, port)
 
-	threadpool = list()
+	thread_pool = list()
 	for i in range(threads):
 		t = threading.Thread(target=thread_worker, args=(conn, head, inwork, output))
 		t.daemon = True
 		t.start()
-		threadpool.append(t)
+		thread_pool.append(t)
 
-	for t in threadpool: t.join()
+	while True:
+		if len(thread_pool) == 0:
+			break
+		for t in thread_pool:
+			if not t.is_alive():
+				thread_pool.remove(t)
+
 	conn.close()
 
 # Function: thread worker. For each entry in the inwork queue, sends one request and reads response status code
 def thread_worker(conn, head, inwork, output):
+	global exit_status
 	while True:
 		directory, entry = inwork.get()
 		if entry is None: break
@@ -254,18 +273,34 @@ def thread_worker(conn, head, inwork, output):
 		# Feedback on the last line of stdout
 		print(colorstring(entry, status=0), end="\r")
 
-		sid = conn.request("HEAD", directory + entry.replace(" ", "%20"), headers=head)
-		try: resp = conn.get_response(sid)
+		try:
+			sid = conn.request("GET", directory + entry.replace(" ", "%20"), headers=head)
+			resp = conn.get_response(sid)
 		except hyper.http20.exceptions.StreamResetError:
 			print(colorstring("[-] Warning: stream reset", status="403"))
 			inwork.put((directory, entry))
+			time.sleep(0.5)
 			continue
+		except ProtocolError as error:
+			print(colorstring("".join(["[-] Error: protocol compliance error. Killing process with PID=", str(os.getpid()), "\n", str(error)]), status="ERROR"))
+			conn.close()
+			exit_status = 1
+			os.kill(os.getpid(), signal.SIGTERM)
+			break
+		except ConnectionResetError as error:
+			print(colorstring("".join(["[-] Error: connection reset. Killing process with PID=", str(os.getpid()), "\n", str(error)]), status="ERROR"))
+			conn.close()
+			exit_status = 1
+			os.kill(os.getpid(), signal.SIGTERM)
+			break
 
 		st = resp.status
 		headers = resp.headers
 
+		# Print found entries
 		if st!=404:
-			if st==301 or st==302 or st==303: tail = " -> " + headers.get(b"location")[0].decode("utf-8")
+			if st==301 or st==302 or st==303:
+				tail = " -> " + headers.get(b"location")[0].decode("utf-8")
 			else:
 				tail = ""
 				if st==200 and isdir(entry):
@@ -290,22 +325,22 @@ if __name__ == '__main__':
 	if platform.system() == "Linux" or platform.system() == "Darwin":
 		NOCOLOR = args.nc
 
+	# Start timer (for benchmarking purposes)
+	t0 = time.time()
+
 	# Input checking
 	try:
 		args.r = int(args.r)
 		args.c = int(args.c)
 		args.t = int(args.t)
 		if args.t<1 or args.c<1 or args.r<0:
-			sys.exit(colorstring("[-] " + CNX_MVAR + " and " + THREADS_MVAR + " must be greater than zero. " + DIR_DEPTH_MVAR + " must be greater than or equal to zero.", status="ERROR"))
+			sys.exit(colorstring("[-] Connections and threads must be greater than zero. Directory depth must be greater than or equal to zero.", status="ERROR"))
 	except ValueError:
-		sys.exit(colorstring("[-] Invalid non-numerical option introduced", status="ERROR"))
+		sys.exit(colorstring("[-] Invalid non-numerical option introduced.", status="ERROR"))
 
 	# Parse file extensions and headers
 	args.x = list(set(args.x.replace("blank", "").split("|")))
 	args.hd = parse_header_opt(args.hd)
-
-	# Start timer (for benchmarking purposes)
-	t0 = time.time()
 
 	# Parse target URL
 	s, ip, port, start_dir = parse_target(args.u)
@@ -328,8 +363,8 @@ if __name__ == '__main__':
 		sys.exit(colorstring("[-] Could not get address information. Are you sure the target exists?", status="ERROR"))
 	except SSLError:
 		sys.exit(colorstring("[-] Unkown TLS error.", status="ERROR"))
-	except ProtocolError as e:
-		sys.exit(colorstring("[-] Protocol compliance error:\n" + str(e), status="ERROR"))
+	except ProtocolError as error:
+		sys.exit(colorstring("[-] Protocol compliance error:\n" + str(error), status="ERROR"))
 	except ConnectionRefusedError:
 		sys.exit(colorstring("[-] Connection refused.", status="ERROR"))
 
@@ -346,12 +381,15 @@ if __name__ == '__main__':
 	print("[*] File extensions: " + ", ".join(["'"+ex+"'" for ex in args.x]))
 	print("[*] Headers:")
 	for k, e in args.hd.items():
-		print("\t" + k + ": " + e)
+		print("".join(["\t", k, ": ", e]))
 	print("[*] Number of connections: " + str(args.c))
 	print("[*] Number of threads per connection: " + str(args.t))
 	print(DASHLINE)
 
+	# This variable can be changed by any of the threads
+	exit_status = 0
+
 	# Start recursive scan
 	main_scan(s, ip, port, start_dir, args, 0)
 
-	print(colorstring("\n[*] Program ran in " + timestamp(t0) + " seconds", status="INFO"))
+	end(t0, exit_status)
