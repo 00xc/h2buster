@@ -1,5 +1,8 @@
 # Changelog #
 
+## 0.3f ##
+* Added an option to ignore specific response codes (`-b`) by providing a list of codes separated by a vertical bar (`|`). Default is 404.
+
 ## 0.3e-2 ##
 * Improved error handling:
 	- Now processes exit gracefully when things go wrong in the middle of a scan instead of hanging.

@@ -9,7 +9,7 @@ from h2.exceptions import ProtocolError
 
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3e-2"
+__version__ = "0.3f"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
 DASHLINE = "------------------------------------------------"
@@ -24,6 +24,7 @@ THREADS_DEFAULT = 20
 NOCOLOR_DEFAULT = False
 EXT_DEFAULT = "/|blank|.html|.php"
 HEADERS_DEFAULT = "user-agent->Mozilla/5.0 (X11; Linux x86_64)"
+BLACKLISTED_DEFAULT = "404"
 
 # CLI options metavariable names
 WORDLIST_MVAR = "wordlist"
@@ -34,6 +35,7 @@ THREADS_MVAR = "threads=" + str(THREADS_DEFAULT)
 NOCOLOR_MVAR = ""
 EXT_MVAR = "extension_list"
 HEADERS_MVAR = "header_list"
+BLACKLISTED_MVAR = "status_code_list"
 
 # CLI options help strings
 WORDLIST_HELP = "Directory wordlist"
@@ -42,8 +44,9 @@ DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, unlimited is 
 CNX_HELP = "Number of HTTP/2 connections."
 THREADS_HELP = "Number of threads per connection."
 NOCOLOR_HELP = "Disable colored output text."
-EXT_HELP = "List of file extensions to check separated by a vertical bar. For example, -x '.php|.js|blank|/'. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split("|")])
+EXT_HELP = "List of file extensions to check separated by a vertical bar (|). For example, -x '.php|.js|blank|/'. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split("|")])
 HEADERS_HELP = "List of headers in the format 'header->value|header->value...'. For example: -hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'."
+BLACLISTED_HELP = "List of blacklisted response codes separated by a vertical bar (|). Directories with these response codes will not be shown in the output. Default is 404."
 
 # Other hardcoded values
 TIMESTAMP_ROUND = 3
@@ -68,7 +71,8 @@ if platform.system() == "Linux" or platform.system() == "Darwin":
 	def colorstring(s, status=0):
 		global NOCOLOR
 		s = "\x1b[K" + s
-		if status==0 or NOCOLOR==True: return s
+		if status==0 or NOCOLOR==True:
+			return s
 		else:
 			try:
 				start = globals()["COLOR_" + str(status)]
@@ -208,7 +212,7 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 	# Start connections
 	process_pool = list()
 	for i in range(args.c):
-		p = multiprocessing.Process(target=process_worker, args=(s, ip, port, args.t, args.hd, inwork, output))
+		p = multiprocessing.Process(target=process_worker, args=(s, ip, port, args.t, args.hd, args.b, inwork, output))
 		p.daemon = True
 		p.start()
 		process_pool.append(p)
@@ -243,13 +247,13 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 		main_scan(s, ip, port, d, args, dir_depth+1)
 
 # Function: process worker. Starts one connection and a number of threads that perform requests on that connection.
-def process_worker(s, ip, port, threads, head, inwork, output):
+def process_worker(s, ip, port, threads, head, blacklisted, inwork, output):
 
 	conn = h2_connect(s, ip, port)
 
 	thread_pool = list()
 	for i in range(threads):
-		t = threading.Thread(target=thread_worker, args=(conn, head, inwork, output))
+		t = threading.Thread(target=thread_worker, args=(conn, head, blacklisted, inwork, output))
 		t.daemon = True
 		t.start()
 		thread_pool.append(t)
@@ -264,7 +268,7 @@ def process_worker(s, ip, port, threads, head, inwork, output):
 	conn.close()
 
 # Function: thread worker. For each entry in the inwork queue, sends one request and reads response status code
-def thread_worker(conn, head, inwork, output):
+def thread_worker(conn, head, blacklisted, inwork, output):
 	global exit_status
 	while True:
 		directory, entry = inwork.get()
@@ -298,7 +302,7 @@ def thread_worker(conn, head, inwork, output):
 		headers = resp.headers
 
 		# Print found entries
-		if st!=404:
+		if st not in blacklisted:
 			if st==301 or st==302 or st==303:
 				tail = " -> " + headers.get(b"location")[0].decode("utf-8")
 			else:
@@ -315,10 +319,10 @@ if __name__ == '__main__':
 	print(DASHLINE)
 
 	# Read CLI inputs
-	opts = ["w", "u", "c", "t", "r", "hd", "x", "nc"]
-	mvar = [WORDLIST_MVAR, TARGET_MVAR, CNX_MVAR, THREADS_MVAR, DIR_DEPTH_MVAR, HEADERS_MVAR, EXT_MVAR, NOCOLOR_MVAR]
-	h = [WORDLIST_HELP, TARGET_HELP, CNX_HELP, THREADS_HELP, DIR_DEPTH_HELP, HEADERS_HELP, EXT_HELP, NOCOLOR_HELP]
-	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, DIR_DEPTH_DEFAULT, HEADERS_DEFAULT, EXT_DEFAULT, NOCOLOR_DEFAULT]
+	opts = ["w", "u", "c", "t", "r", "hd", "x", "b", "nc"]
+	mvar = [WORDLIST_MVAR, TARGET_MVAR, CNX_MVAR, THREADS_MVAR, DIR_DEPTH_MVAR, HEADERS_MVAR, EXT_MVAR, BLACKLISTED_MVAR, NOCOLOR_MVAR]
+	h = [WORDLIST_HELP, TARGET_HELP, CNX_HELP, THREADS_HELP, DIR_DEPTH_HELP, HEADERS_HELP, EXT_HELP, BLACLISTED_HELP, NOCOLOR_HELP]
+	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, DIR_DEPTH_DEFAULT, HEADERS_DEFAULT, EXT_DEFAULT, BLACKLISTED_DEFAULT, NOCOLOR_DEFAULT]
 	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
 
 	# Set NOCOLOR as global constant so colorstring() knows what to do
@@ -338,9 +342,12 @@ if __name__ == '__main__':
 	except ValueError:
 		sys.exit(colorstring("[-] Invalid non-numerical option introduced.", status="ERROR"))
 
-	# Parse file extensions and headers
+	# Parse listed arguments
 	args.x = list(set(args.x.replace("blank", "").split("|")))
 	args.hd = parse_header_opt(args.hd)
+	args.b = list(set(args.b.split("|")))
+	try: args.b = [int(c) for c in args.b]
+	except ValueError: sys.exit(colorstring("[-] Blacklisted codes must be numerical.", status="ERROR"))
 
 	# Parse target URL
 	s, ip, port, start_dir = parse_target(args.u)
@@ -378,6 +385,7 @@ if __name__ == '__main__':
 	else: print("[*] TLS is OFF")
 	print("[*] Base directory: " + start_dir)
 	print("[*] Maximum directory depth: " + str(args.r) + " (base directory is depth 1)")
+	print("[*] Ignored response codes: " + ", ".join([str(c) for c in args.b]))
 	print("[*] File extensions: " + ", ".join(["'"+ex+"'" for ex in args.x]))
 	print("[*] Headers:")
 	for k, e in args.hd.items():
