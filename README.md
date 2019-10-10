@@ -23,7 +23,7 @@ usage: h2buster.py [-h] -w wordlist -u target [-c connections=4]
 h2buster: an HTTP/2 web directory brute-force scanner.
 
 arguments:
-   -h, --help            show this help message and exit
+  -h, --help            show this help message and exit
   -w wordlist           Directory wordlist
   -u target             Target URL/IP address (host[:port]). Default port is
                         443 and HTTPS enabled. To specify otherwise, use
