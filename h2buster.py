@@ -1,18 +1,33 @@
 #!/usr/bin/env python3
+
+# HTTP/2 I/O module
 import hyper
-import threading, queue, multiprocessing
+
+# Native modules
+import threading, multiprocessing
 import ssl, sys, time, argparse, os
 import platform, signal
+
+# Exceptions
 from socket import gaierror
 from ssl import SSLError
 from h2.exceptions import ProtocolError
 
+# Internal module parsers
+from libh2buster import UrlParser, RobotParser
+
 # Metadata variables
 __author__ = "https://github.com/00xc/"
-__version__ = "0.3f"
+__version__ = "0.4a"
 
 PROGRAM_INFO = "h2buster: an HTTP/2 web directory brute-force scanner."
-DASHLINE = "------------------------------------------------"
+DASHLINE = "---------------------------------------------------------------"
+
+# Hardcoded values
+TIMESTAMP_ROUND = 3
+STREAM_RESET_SLEEP = 1
+DEFAULT_TLS = True
+DEFAULT_PORT = 443
 
 # CLI options default values.
 # None means required. Boolean means that the option has no argument (either the flag is there or not)
@@ -21,6 +36,7 @@ TARGET_DEFAULT = None
 DIR_DEPTH_DEFAULT = 2
 CNX_DEFAULT = 4
 THREADS_DEFAULT = 20
+ROBOTS_DEFAULT = False
 NOCOLOR_DEFAULT = False
 EXT_DEFAULT = "/|blank|.html|.php"
 HEADERS_DEFAULT = "user-agent->Mozilla/5.0 (X11; Linux x86_64)"
@@ -32,40 +48,38 @@ TARGET_MVAR = "target"
 DIR_DEPTH_MVAR = "directory_depth=" + str(DIR_DEPTH_DEFAULT)
 CNX_MVAR = "connections=" + str(CNX_DEFAULT)
 THREADS_MVAR = "threads=" + str(THREADS_DEFAULT)
+ROBOTS_MVAR = ""
 NOCOLOR_MVAR = ""
 EXT_MVAR = "extension_list"
 HEADERS_MVAR = "header_list"
-BLACKLISTED_MVAR = "status_code_list"
+BLACKLISTED_MVAR = "http_code_list"
 
 # CLI options help strings
 WORDLIST_HELP = "Directory wordlist"
-TARGET_HELP = "Target URL/IP address (host[:port]). Default port is 443 and HTTPS enabled. To specify otherwise, use ':port' or 'http://' (port will default to 80 then)."
+TARGET_HELP = "Target URL/IP address ([scheme://]host[:port]). Default port is 443 and HTTPS enabled. To specify otherwise, use ':port' and/or 'http://' (port will default to 80 then)."
 DIR_DEPTH_HELP = "Maximum recursive directory depth. Minimum is 1, unlimited is 0."
 CNX_HELP = "Number of HTTP/2 connections."
 THREADS_HELP = "Number of threads per connection."
-NOCOLOR_HELP = "Disable colored output text."
-EXT_HELP = "List of file extensions to check separated by a vertical bar (|). For example, -x '.php|.js|blank|/'. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join(["'"+ex+"'" for ex in EXT_DEFAULT.split("|")])
+ROBOTS_HELP = "Flag: scan for a robots.txt file. If found, a prompt will be displayed asking whether to use the results."
+NOCOLOR_HELP = "Flag: disable colored output text."
+EXT_HELP = "List of file extensions to check separated by a vertical bar (|). For example, -x '.php|.js|blank|/'. The 'blank' keyword signifies no file extension. Default extensions are " + ", ".join([f"'{ex}'" for ex in EXT_DEFAULT.split("|")])
 HEADERS_HELP = "List of headers in the format 'header->value|header->value...'. For example: -hd 'user-agent->Mozilla/5.0|accept-encoding->gzip, deflate, br'."
 BLACLISTED_HELP = "List of blacklisted response codes separated by a vertical bar (|). Directories with these response codes will not be shown in the output. Default is 404."
 
-# Other hardcoded values
-TIMESTAMP_ROUND = 3
-TLS_ON = True
-TLS_OFF = False
-TLS_PORT = 443
-
 # Define colors and color functions (only Linux and OS X)
 if platform.system() == "Linux" or platform.system() == "Darwin":
-	COLOR_200 = '\033[92m' # green
-	COLOR_301 = '\033[94m' # blue
-	COLOR_302 = '\033[94m' # blue
-	COLOR_303 = '\033[94m' # blue
-	COLOR_400 = '\033[91m' # red
-	COLOR_403 = '\033[93m' # yellow
-	COLOR_999 = '\033[91m' # red
-	COLOR_ERROR = '\033[91m' # red
-	COLOR_END = '\033[0m' # end color
-	COLOR_BOLD = '\033[1m' # bold
+	COLOR_200 = '\033[92m'	# green
+	COLOR_301 = '\033[94m'	# blue
+	COLOR_302 = '\033[94m'	# blue
+	COLOR_303 = '\033[94m'	# blue
+	COLOR_400 = '\033[91m'	# red
+	COLOR_403 = '\033[93m'	# yellow
+	COLOR_405 = '\033[93m'	# yellow
+	COLOR_503 = '\033[91m' 	# red
+	COLOR_999 = '\033[91m' 	# red
+	COLOR_ERROR = '\033[91m'	# red
+	COLOR_END = '\033[0m' 	# end color
+	COLOR_BOLD = '\033[1m'	# bold
 
 	# Function: return line with colors according to status code
 	def colorstring(s, status=0):
@@ -82,15 +96,16 @@ if platform.system() == "Linux" or platform.system() == "Darwin":
 				return s
 else:
 	# This function is a mess trying to keep things readable in (old) Windows CMD
+	# INFO returns the string plus a clear of the previous line
 	# status = 0 will return a blank string
 	def colorstring(s, status=0):
 		if status == "INFO":
 			# Extremely hacky solution to clear last line of stdout on Windows cmd
 			return ("\t\t\t\t\t\t.\r").rstrip() + s
 		elif status!=0:
-			# The only inputs without a status are the feedback prints, so we can suppress them (we can't clear last line in Windows cmd easily)
 			return s
 		else:
+			# The only inputs without a status are the feedback prints, so we can suppress them (we can't clear last line in Windows cmd easily)
 			return ""
 
 # Function: return time since t0
@@ -99,8 +114,8 @@ def _timestamp(t0):
 
 # Function: print total running time
 def end(t0, exit_status):
-	if exit_status == 0: print(colorstring(" ".join(["\n[*] Program ran in", _timestamp(t0), "seconds"]), status="INFO"))
-	else: print(colorstring(" ".join(["\n\n[*] Program aborted after", _timestamp(t0), "seconds"]), status="INFO"))
+	if exit_status == 0: print(colorstring(f"\n[*] Scan done in {_timestamp(t0)} seconds.", status="INFO"))
+	else: print(colorstring(f"[*] Scan aborted after {_timestamp(t0)} seconds.", status="INFO"))
 
 # Function: return True if entry is a directory, False otherwise.
 def isdir(e):
@@ -128,49 +143,12 @@ def read_inputs(info, opts, h, defaults, mvar):
 
 # Function: parse protocol (TLS or not), port and starting directory from imput target
 def parse_target(target):
-
-	# Protocol
-	target = target.split("://")
-	if len(target) == 1:
-		url = target[0]
-		s = None
-	else:
-		url = target[1]
-		if target[0] == "http": s = TLS_OFF
-		elif target[0] == "https": s = TLS_ON
-		else: sys.exit(colorstring("[-] Invalid URL", status="ERROR"))
-		
-	# Directory 
-	url = url.split("/", 1)
-	tup = url[0]
-	if len(url) == 1 or len(url[1])==0:
-		directory = "/"
-	else:
-		directory = "/" + url[1]
-		if directory[-1]!="/": directory = directory + "/"
-
-	# IP / port
-	if tup.count(":") == 0:
-		ip = tup
-		if s==TLS_ON: port = 443
-		elif s==TLS_OFF: port = 80
-		else:
-			s = TLS_ON
-			port = TLS_PORT
-	elif tup.count(":") == 1:
-		try:
-			ip, port = tup.split(":", 1)
-			port = int(port)
-		except ValueError:
-			sys.exit(colorstring("[-] Invalid URL", status="ERROR"))
-		if port == 80 and target[0]!="https":
-			s = TLS_OFF
-		else:
-			s = TLS_ON
-	else:
-		sys.exit(colorstring("[-] Invalid URL", status="ERROR"))
-
-	return s, ip, port, directory
+	try:
+		p = UrlParser(default_secure=DEFAULT_TLS, default_port=DEFAULT_PORT)
+		p.parse(target)
+		return p.secure, p.host, p.port, p.path
+	except ValueError as error:
+		sys.exit(colorstring(f"[-] {error}", status="ERROR"))
 
 # Function: parse input headers
 def parse_header_opt(hd):
@@ -186,28 +164,29 @@ def parse_header_opt(hd):
 
 # Function: connect via H2 to specified IP[:port] and return connection object
 def h2_connect(s, ip, port):
-	if s == TLS_ON:
+	if s == True:
 		ctx = ssl.SSLContext()
 		ctx.set_alpn_protocols(['h2'])
 		ctx.verify_mode = ssl.CERT_NONE
-		conn = hyper.HTTP20Connection(ip, port=port, ssl_context=ctx, enable_push=False)
-	elif s == TLS_OFF:
-		conn = hyper.HTTP20Connection(ip, port=port, enable_push=False)
+		conn = hyper.HTTP20Connection(ip, port=port, ssl_context=ctx)
+	elif s == False:
+		conn = hyper.HTTP20Connection(ip, port=port)
 	conn.connect()
 	return conn
 
 # Function: main scan function. Starts up a number of processes which handle their own h2 connection and sends them entries to scan
-def main_scan(s, ip, port, directory, args, dir_depth):
+def main_scan(s, ip, port, directory, args, dir_depth, robots_content):
 
 	if args.r!=0:
 		if dir_depth >= args.r: return
 
-	print(colorstring("\n[*] Starting scan on " + directory, status="INFO"))
+	print(colorstring(f"\n[*] Starting scan on {directory}", status="INFO"))
 
 	# Start input/output queues
 	manager = multiprocessing.Manager()
 	output = manager.list()
 	inwork = manager.Queue()
+	seen = set()
 
 	# Start connections
 	process_pool = list()
@@ -218,13 +197,40 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 		process_pool.append(p)
 
 	try:
-		# Put work
+		# Add dictionary entries to queue
 		with open(args.w, "r") as f:
 			for entry in f:
 				if entry[0]=="#": continue
 				entry = entry.rstrip()
-				for ex in args.x:
-					inwork.put((directory, entry+ex))
+				if entry not in seen:
+					for ex in args.x:
+						inwork.put((directory, entry+ex))
+					seen.add(entry)
+
+		# Add robots.txt entries to queue
+		for entry in robots_content:
+			if len(entry) >= (dir_depth+1):
+				if dir_depth == 0 or (entry[dir_depth-1] == directory):
+					if entry[dir_depth] not in seen:
+						if entry[dir_depth].count("*")>0:
+							for ex in args.x:
+								inwork.put((directory, entry[dir_depth].replace("*", ex)))
+						else:
+							inwork.put((directory, entry[dir_depth]))
+						seen.add(entry[dir_depth])
+
+		# Add full path robots.txt entries too
+		if dir_depth == 0:
+			for entry in robots_content:
+				entry = "".join(entry)
+				if entry not in seen:
+					if entry.count("*")>0:
+						for ex in args.x:
+							inwork.put(("/", entry.replace("*", ex)))
+					else:
+						inwork.put(("/", entry))
+					seen.add(entry)
+
 
 		# Send kill signals and wait until processes are done
 		for i in range(args.c*args.t):
@@ -244,13 +250,11 @@ def main_scan(s, ip, port, directory, args, dir_depth):
 
 	# Recursive calls with found directories
 	for d in output:
-		main_scan(s, ip, port, d, args, dir_depth+1)
+		main_scan(s, ip, port, d, args, dir_depth+1, robots_content)
 
 # Function: process worker. Starts one connection and a number of threads that perform requests on that connection.
 def process_worker(s, ip, port, threads, head, blacklisted, inwork, output):
-
 	conn = h2_connect(s, ip, port)
-
 	thread_pool = list()
 	for i in range(threads):
 		t = threading.Thread(target=thread_worker, args=(conn, head, blacklisted, inwork, output))
@@ -258,13 +262,7 @@ def process_worker(s, ip, port, threads, head, blacklisted, inwork, output):
 		t.start()
 		thread_pool.append(t)
 
-	while True:
-		if len(thread_pool) == 0:
-			break
-		for t in thread_pool:
-			if not t.is_alive():
-				thread_pool.remove(t)
-
+	for t in thread_pool: t.join()
 	conn.close()
 
 # Function: thread worker. For each entry in the inwork queue, sends one request and reads response status code
@@ -281,18 +279,18 @@ def thread_worker(conn, head, blacklisted, inwork, output):
 			sid = conn.request("HEAD", directory + entry.replace(" ", "%20"), headers=head)
 			resp = conn.get_response(sid)
 		except hyper.http20.exceptions.StreamResetError:
-			print(colorstring("[-] Warning: stream reset", status="403"))
+			print(colorstring(f"[-] Warning: stream reset. Pausing thread for a bit in process with PID={os.getpid()}", status="403"))
 			inwork.put((directory, entry))
-			time.sleep(0.5)
+			time.sleep(STREAM_RESET_SLEEP)
 			continue
 		except ProtocolError as error:
-			print(colorstring("".join(["[-] Error: protocol compliance error. Killing process with PID=", str(os.getpid()), "\n", str(error)]), status="ERROR"))
+			print(colorstring(f"[-] Error: protocol compliance error. Killing process with PID={os.getpid()}\n{error}", status="ERROR"))
 			conn.close()
 			exit_status = 1
 			os.kill(os.getpid(), signal.SIGTERM)
 			break
 		except ConnectionResetError as error:
-			print(colorstring("".join(["[-] Error: connection reset. Killing process with PID=", str(os.getpid()), "\n", str(error)]), status="ERROR"))
+			print(colorstring(f"[-] Error. connection reset. Killing process with PID={os.getpid()}\n{error}", status="ERROR"))
 			conn.close()
 			exit_status = 1
 			os.kill(os.getpid(), signal.SIGTERM)
@@ -304,12 +302,64 @@ def thread_worker(conn, head, blacklisted, inwork, output):
 		# Print found entries
 		if st not in blacklisted:
 			if st==301 or st==302 or st==303:
-				tail = " -> " + headers.get(b"location")[0].decode("utf-8")
+				tail = f" -> {headers.get(b'location')[0].decode('utf-8')}"
 			else:
 				tail = ""
 				if st==200 and isdir(entry):
 					output.append(directory + entry)
-			print(colorstring("".join([directory, entry, ": ", str(st), tail]), status=st))
+			print(colorstring(f"{directory}{entry}: {st}{tail}", status=st))
+
+# Function: parse robot entries and prompt for their use
+def parse_robots(ip, port, content, ua):
+	try:
+		if len(content) > 0:
+
+			content = content.decode("utf-8")
+
+			# Parse entry
+			try:
+				p = RobotParser(ua)
+				p.parse(content, policy="all")
+				all_entries = p.get_entries()
+				p.parse(content, policy="allow")
+				allowed_entries = p.get_entries()
+			except ValueError as error:
+				sys.exit(colorstring(f"[-] {error}", status="ERROR"))
+
+			print(DASHLINE)
+			print(colorstring(f"[+] {ip}{':'+port if port not in [80, 443] else ''}/robots.txt found!", status=200))
+			if len(all_entries)>0:
+				print(f"[*] Found {len(all_entries)} total entries.")
+				print(f"[*] Found {len(allowed_entries)} allowed entries.")
+				print("Should we use this information?")
+			else:
+				print(colorstring("[-] File is empty, nothing to use here.", status=403))
+				return set()
+
+			use_robots = None
+			while use_robots is None:
+				use_robots = input("\t[A/a] to use all entries\n\t[Y/y] to use only allowed entries\n\t[N/n] to ignore all entries.\nSelected option: ")
+				use_robots = use_robots.lower()
+				if use_robots not in ["a", "y", "n"]:
+					use_robots = None
+
+			if use_robots == "a": out_entries = all_entries
+			elif use_robots == "y": out_entries = allowed_entries
+			else: out_entries = set()
+
+			# Convert each entry into an n-tuple of directories (must use tuple, cannot have a set of lists)
+			out_parsed_entries = set()
+			for entry in out_entries:
+				parsed_entry = [f+"/" for f in entry.split("/") if f!=""]
+				if entry[-1] != "/":
+					parsed_entry[-1] = parsed_entry[-1][:-1]
+				out_parsed_entries.add(tuple(parsed_entry))
+			return out_parsed_entries
+
+		return set()
+
+	except KeyboardInterrupt:
+		sys.exit("")
 
 # Main start point. Read, verify inputs and call main_scan()
 if __name__ == '__main__':
@@ -319,18 +369,15 @@ if __name__ == '__main__':
 	print(DASHLINE)
 
 	# Read CLI inputs
-	opts = ["w", "u", "c", "t", "r", "hd", "x", "b", "nc"]
-	mvar = [WORDLIST_MVAR, TARGET_MVAR, CNX_MVAR, THREADS_MVAR, DIR_DEPTH_MVAR, HEADERS_MVAR, EXT_MVAR, BLACKLISTED_MVAR, NOCOLOR_MVAR]
-	h = [WORDLIST_HELP, TARGET_HELP, CNX_HELP, THREADS_HELP, DIR_DEPTH_HELP, HEADERS_HELP, EXT_HELP, BLACLISTED_HELP, NOCOLOR_HELP]
-	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, DIR_DEPTH_DEFAULT, HEADERS_DEFAULT, EXT_DEFAULT, BLACKLISTED_DEFAULT, NOCOLOR_DEFAULT]
+	opts = ["w", "u", "c", "t", "r", "hd", "x", "b", "rb", "nc"]
+	mvar = [WORDLIST_MVAR, TARGET_MVAR, CNX_MVAR, THREADS_MVAR, DIR_DEPTH_MVAR, HEADERS_MVAR, EXT_MVAR, BLACKLISTED_MVAR, ROBOTS_MVAR, NOCOLOR_MVAR]
+	h = [WORDLIST_HELP, TARGET_HELP, CNX_HELP, THREADS_HELP, DIR_DEPTH_HELP, HEADERS_HELP, EXT_HELP, BLACLISTED_HELP, ROBOTS_HELP, NOCOLOR_HELP]
+	defaults = [WORDLIST_DEFAULT, TARGET_DEFAULT, CNX_DEFAULT, THREADS_DEFAULT, DIR_DEPTH_DEFAULT, HEADERS_DEFAULT, EXT_DEFAULT, BLACKLISTED_DEFAULT, ROBOTS_DEFAULT, NOCOLOR_DEFAULT]
 	args = read_inputs(PROGRAM_INFO, opts, h, defaults, mvar)
 
 	# Set NOCOLOR as global constant so colorstring() knows what to do
 	if platform.system() == "Linux" or platform.system() == "Darwin":
 		NOCOLOR = args.nc
-
-	# Start timer (for benchmarking purposes)
-	t0 = time.time()
 
 	# Input checking
 	try:
@@ -345,7 +392,7 @@ if __name__ == '__main__':
 	# Parse listed arguments
 	args.x = list(set(args.x.replace("blank", "").split("|")))
 	args.hd = parse_header_opt(args.hd)
-	args.b = list(set(args.b.split("|")))
+	args.b = set(args.b.split("|"))
 	try: args.b = [int(c) for c in args.b]
 	except ValueError: sys.exit(colorstring("[-] Blacklisted codes must be numerical.", status="ERROR"))
 
@@ -357,6 +404,17 @@ if __name__ == '__main__':
 		conn = h2_connect(s, ip, port)
 		sid = conn.request("HEAD", start_dir)
 		resp = conn.get_response(sid)
+
+		# robots.txt
+		if args.rb:
+			sid = conn.request("GET", "/robots.txt")
+			resp = conn.get_response(sid)
+			if resp.status == 200:
+				robots_content = resp.read()
+				if len(robots_content) == 0:
+					robots_content = False
+			else:
+				robots_content = False
 		try:
 			server = resp.headers.get(b"server")[0].decode("utf-8")
 		except TypeError:
@@ -371,33 +429,39 @@ if __name__ == '__main__':
 	except SSLError:
 		sys.exit(colorstring("[-] Unkown TLS error.", status="ERROR"))
 	except ProtocolError as error:
-		sys.exit(colorstring("[-] Protocol compliance error:\n" + str(error), status="ERROR"))
+		sys.exit(colorstring(f"[-] Protocol complicance error:\n{error}", status="ERROR"))
 	except ConnectionRefusedError:
 		sys.exit(colorstring("[-] Connection refused.", status="ERROR"))
+	except Exception as error:
+		sys.exit(colorstring(f"[-] Error:\n{error}", status="ERROR"))
 
 	conn.close()
 	print(colorstring("[+] Target supports HTTP/2", status=200))
-	if server: print(colorstring("[+] Target server: " + server, status=200))
+	if server: print(colorstring(f"[+] Target server: {server}", status=200))
 
 	# Print info
-	print("[*] Initializing scan on " + colorstring(ip, status="BOLD"))
-	if s==TLS_ON: print("[*] TLS is ON")
-	else: print("[*] TLS is OFF")
-	print("[*] Base directory: " + start_dir)
-	print("[*] Maximum directory depth: " + str(args.r) + " (base directory is depth 1)")
+	print("[*] Initializing scan on ", end="")
+	print(colorstring(f"{ip}{':'+port if port not in [80, 443] else ''}", status="BOLD"))
+	print(f"[*] TLS is {'ON' if s else 'OFF'}")
+	print(f"[*] Base directory: {start_dir}")
+	print(f"[*] Maximum directory depth: {args.r} (base directory is depth 1)")
 	print("[*] Ignored response codes: " + ", ".join([str(c) for c in args.b]))
-	print("[*] File extensions: " + ", ".join(["'"+ex+"'" for ex in args.x]))
+	print("[*] File extensions: " + ", ".join([f"'{ex}'" for ex in args.x]))
 	print("[*] Headers:")
 	for k, e in args.hd.items():
-		print("".join(["\t", k, ": ", e]))
-	print("[*] Number of connections: " + str(args.c))
-	print("[*] Number of threads per connection: " + str(args.t))
+		print(f"\t{k}: {e}")
+	print(f"[*] Number of connections: {args.c}")
+	print(f"[*] Number of threads per connection: {args.t}")
+	if args.rb and robots_content: parsed_robots_content = parse_robots(ip, port, robots_content, args.hd.get("user-agent", "h2buster"))
+	else: parsed_robots_content = set()
 	print(DASHLINE)
 
 	# This variable can be changed by any of the threads
 	exit_status = 0
 
-	# Start recursive scan
-	main_scan(s, ip, port, start_dir, args, 0)
+	# Start timer (for benchmarking purposes)
+	t0 = time.time()
 
+	# Start recursive scan and exit when it returns
+	main_scan(s, ip, port, start_dir, args, 0, parsed_robots_content)
 	end(t0, exit_status)

@@ -1,5 +1,21 @@
 # Changelog #
 
+## 0.4a ##
+* Updated most strings to f-strings. **This makes Python 3.6 a requirement**.
+* Added the option to scan for the robots.txt file (`-rb`):
+	- If found, the user is prompted about whether to use its information or not.
+	- The user can either retrieve all entries in the file, just the allowed ones based on our own User Agent, or completely ignore the file.
+	- HOWEVER, dictionary entries **ARE NOT CHECKED** against the robots.txt rules. Use your wordlist at your own risk. I might add the option to only use dictionary entries if they are allowed as a command line option in the future.
+	- The information obtained from this file can be used in a smarter way. For now all the directories found are checked in their respective recursive depth. The entry `/a/b/c` will result in checking `/a` in the first iteration. If `/a` is found, `/a/b` will be searched in the next recursive iteration. Repeat this process for `/a/b/c`.
+* Reset HTTP/2 streams:
+	- More information is given about the process which handles that stream.
+	- Increased sleep time for the thread handling that reset.
+* Removed an unnecessary include. The rest of the includes are now tidier.
+* Duplicated entries in the input wordlist are just requested once.
+* Increased modularity by moving parser algorithms to external classes.
+* Removed the `enable_push` parameter for a call to the underlying hyper library - some versions don't seem to accept it.
+* Changed the way time is benchmarked. Now it represents how much seconds the actual scan took (as opposed to the time of option parsing & checking + the scan).
+
 ## 0.3f ##
 * Added an option to ignore specific response codes (`-b`) by providing a list of codes separated by a vertical bar (`|`). Default is 404.
 
@@ -31,7 +47,7 @@
 * Other very slight performance improvements.
 
 ## 0.3c-1 ##
-* Fixed a bug where not using `-wc` on Windows would crash the program.
+* Fixed a bug where not using `-nc` on Windows would crash the program.
 * Fixed a bug where found directories with a space on them would not be properly URL encoded when scanning them.
 
 ## 0.3c ##
