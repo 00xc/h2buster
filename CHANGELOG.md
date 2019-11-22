@@ -4,6 +4,7 @@
 * Several performance improvements.
 * Bug fixes in the robots.txt parser.
 * Sitemaps in robots.txt are now reported for manual inspection if found (they are not parsed).
+* Added an option (`-vr`) to verify TLS certificates (otherwise it is not checked).
 * Duplicated entries are properly filtered, now taking into account file extensions.
 * Status code display made cleaner.
 
