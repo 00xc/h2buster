@@ -5,35 +5,52 @@ class RobotParser:
 	def __init__(self, user_agent=""):
 		self.user_agent = user_agent
 		self.entries = set()
+		self.sitemaps = set()
 
 	def parse(self, content, policy="allow"):
 		policy = policy.lower()
-		if policy not in ["all",  "allow"]:
+		if policy not in ("all",  "allow"):
 			raise ValueError("Invalid robot policy.")
 
-		# Clean previous entries
+		# Initialize variables for this parsing call
 		self.entries = set()
-
+		self.sitemaps = set()
+		disallowed = set()
+		applies = False
 		content = content.split("\n")
-		for line in content:
-			if len(line) == 0: continue
-			if line[0] == "#": continue
-			if line.count(":") == 0: continue
 
+		# Loop over robots.txt content
+		for line in content:
+			if len(line) == 0 or line[0] == "#" or line.count(":") == 0: continue
 			line = [x.lstrip().split("$")[0] for x in line.rstrip().lower().split(":", 1)]
 
+			# Rules for a specific useragent
 			if line[0] == "user-agent":
 				if policy=="allow" and fnmatch.filter(self.user_agent, line[1]):
 					applies = True
 				else:
 					applies = False
 
-			elif line[0] in ["allow", "disallow"]:
-				if applies == False or (applies == True and line[0] == "allow"):
-					if len(line[1])>0:	self.entries.add(line[1])
+			# Entry for a specific URI
+			elif line[0] in ("allow", "disallow"):
+				if (not applies and line[1] not in disallowed) or (applies and line[0] == "allow"):
+					if len(line[1])>0:
+						self.entries.add(line[1])
+
+				elif applies and line[0] == "disallow":
+					disallowed.add(line[1])
+					self.entries.discard(line[1])
+
+			# URI for a sitemap
+			elif line[0] == "sitemap":
+				self.sitemaps.add(line[1])
 
 	def get_entries(self):
 		return self.entries
+
+	def get_sitemaps(self):
+		return self.sitemaps
+
 
 class UrlParser:
 
