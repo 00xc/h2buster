@@ -1,4 +1,4 @@
-# h2buster (v0.4a) #
+# h2buster (v0.4b) #
 A fast, threaded, recursive, web directory brute-force scanner over HTTP/2 using [hyper](https://github.com/Lukasa/hyper), inspired by [Gobuster](https://github.com/OJ/gobuster).
 
 ## Features ##
@@ -8,6 +8,7 @@ A fast, threaded, recursive, web directory brute-force scanner over HTTP/2 using
 * Scalable: scans can be as docile or aggressive as you configure them to be.
 * h2 and h2c support.
 * Configurable directory recursion depth.
+* robots.txt scanning.
 * Multiplatform: works on both \*nix and Windows.
 
 ## Install ##
@@ -19,8 +20,7 @@ You only need to install one dependency. If you don't have [hyper](https://githu
 ```
 usage: h2buster.py [-h] -w wordlist -u target [-c connections=4]
                    [-t threads=20] [-r directory_depth=2] [-hd header_list]
-                   [-x extension_list] [-b http_code_list] [-rb] [-nc]
-
+                   [-x extension_list] [-b http_code_list] [-vr] [-rb] [-nc]
 
 h2buster: an HTTP/2 web directory brute-force scanner.
 
@@ -46,6 +46,7 @@ arguments:
   -b http_code_list     List of blacklisted response codes separated by a
                         vertical bar (|). Directories with these response
                         codes will not be shown in the output. Default is 404.
+  -vr                   Flag: force TLS certificate verification.
   -rb                   Flag: scan for a robots.txt file. If found, a prompt
                         will be displayed asking whether to use the results.
   -nc                   Flag: disable colored output text.

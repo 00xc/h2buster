@@ -482,7 +482,7 @@ if __name__ == '__main__':
 	except SSLError as error:
 		sys.exit(colorstring(f"[-] TLS error.\n{error}", status="ERROR"))
 	except ProtocolError as error:
-		sys.exit(colorstring(f"[-] Protocol complicance error:\n{error}", status="ERROR"))
+		sys.exit(colorstring(f"[-] Protocol compliance error:\n{error}", status="ERROR"))
 	except ConnectionRefusedError:
 		sys.exit(colorstring("[-] Connection refused.", status="ERROR"))
 	except Exception as error:

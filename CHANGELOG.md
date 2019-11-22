@@ -1,5 +1,12 @@
 # Changelog #
 
+## 0.4b ##
+* Several performance improvements.
+* Bug fixes in the robots.txt parser.
+* Sitemaps in robots.txt are now reported for manual inspection if found (they are not parsed).
+* Duplicated entries are properly filtered, now taking into account file extensions.
+* Status code display made cleaner.
+
 ## 0.4a ##
 * Updated most strings to f-strings. **This makes Python 3.6 a requirement**.
 * Added the option to scan for the robots.txt file (`-rb`):
