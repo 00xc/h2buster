@@ -59,9 +59,10 @@ class UrlParser:
 		self.default_port = default_port
 
 	def parse(self, url):
+
 		# Remove GET parameters
 		if url.count("?") > 0:
-			target, params = tuple(url.split("?", 1))
+			target, params = url.split("?", 1)
 		else:
 			target = url
 			params = ""
@@ -85,7 +86,7 @@ class UrlParser:
 			directory = "/"
 		else:
 			directory = "/" + url[1]
-			if directory[-1]!="/": directory = directory + "/"
+			if directory[-1]!="/": directory = directory + "/"	# force URIs to end in /
 
 		# IP / port
 		if tup.count(":") == 0:

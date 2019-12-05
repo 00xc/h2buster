@@ -1,10 +1,17 @@
 # Changelog #
 
+## 0.4c ##
+* Added an option to change the HTTP request method (`-m`). Valid values are HEAD (default) and GET.
+* Added an option to display the response size (`-l`). This overrides the request method to GET.
+* robots.txt scan output now more verbose.
+* Fixed the case where visiting /robots.txt gives a redirection (when using `-rb`).
+* Minor performance improvements.
+
 ## 0.4b ##
 * Several performance improvements.
 * Bug fixes in the robots.txt parser.
 * Sitemaps in robots.txt are now reported for manual inspection if found (they are not parsed).
-* Added an option (`-vr`) to verify TLS certificates (otherwise it is not checked).
+* Added an option (`-vr`) to verify TLS certificates (otherwise they are not checked).
 * Duplicated entries are properly filtered, now taking into account file extensions.
 * Status code display made cleaner.
 

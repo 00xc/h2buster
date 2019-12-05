@@ -3,16 +3,14 @@
 * Check if a found directory is listable before scanning it. [dirb](https://gitlab.com/kalilinux/packages/dirb/) does this accurately, perhaps ideas can be taken from there.
 * Use sitemap.xml after parsing robots.txt.
 * Add command line options for more functionality. Some ideas:
-	- Subdomain scanning.
 	- HTTP basic auth.
 	- Proxy usage.
 	- Configurable time between requests in the same connection to avoid flooding.
-	- Require valid certificates.
 
 ## Other ideas/possible updates ##
+* Subdomain scanning.
 * Test [hyper](https://github.com/Lukasa/hyper)'s window_manager to increase throughput.
-* Make the search breadth-first.
 * Add support for HTTP/1.
-- HTML parsing for web crawling (might slow things down a lot).
-* Add a custom 404 page content, so that sites that reply with a 200 code but display a "not found" page can be filtered. This requires parsing HTML.
-- Output results as a JSON file.
+* HTML parsing for web crawling (might slow things down a lot).
+* Add a custom 404 page content, so that sites that reply with a 200 code but display a "not found" page can be filtered. This requires parsing HTML. Alternatively, testing if web content is the same throughout several random requests.
+* Output results as a JSON file.
