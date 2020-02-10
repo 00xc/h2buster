@@ -1,4 +1,47 @@
 import fnmatch
+import random, string
+
+class NotfoundWildcard:
+
+	__slots__ = (
+		"request_string",
+		"status",
+		"redirect",
+		"real_redirect",
+		"content",
+		"real_content",
+		"response_length"
+	)
+
+	def __init__(self, connection, method, redirect_codes):
+		self.request_string = "/" + "".join((random.choice(string.ascii_lowercase) for _ in range(20)))
+		sid = connection.request(method, self.request_string)
+		resp = connection.get_response(sid)
+
+		if resp.status in redirect_codes:
+			self.redirect = resp.headers.get(b'location')[0].decode('utf-8')
+			self.real_redirect = self.redirect.replace(self.request_string, "")
+		else:
+			self.redirect = False
+			self.real_redirect = False
+
+		self.content = resp.read().decode('utf-8')
+		self.real_content = self.content.replace(self.request_string, "")
+		self.response_length = len(self.content)
+		self.status = resp.status
+
+	def match(self, request_string, content, status, redirect):
+		if status == 404:
+			return False
+
+		if self.redirect and redirect:
+			return (self.real_redirect == redirect.replace(request_string, ""))
+
+		elif self.response_length > 0 and len(content) > 0:
+			return (self.real_content == content.replace(request_string, ""))
+
+		else:
+			return False
 
 class RobotParser:
 
@@ -22,7 +65,7 @@ class RobotParser:
 		# Loop over robots.txt content
 		for line in content:
 			if len(line) == 0 or line[0] == "#" or line.count(":") == 0: continue
-			line = [x.lstrip().split("$")[0] for x in line.rstrip().lower().split(":", 1)]
+			line = tuple([x.lstrip().split("$")[0] for x in line.rstrip().lower().split(":", 1)])
 
 			# Rules for a specific useragent
 			if line[0] == "user-agent":
@@ -41,7 +84,7 @@ class RobotParser:
 					disallowed.add(line[1])
 					self.entries.discard(line[1])
 
-			# URI for a sitemap
+			# URL for a sitemap
 			elif line[0] == "sitemap":
 				self.sitemaps.add(line[1])
 
@@ -86,7 +129,7 @@ class UrlParser:
 			directory = "/"
 		else:
 			directory = "/" + url[1]
-			if directory[-1]!="/": directory = directory + "/"	# force URIs to end in /
+			if directory[-1]!="/": directory = directory + "/"	# force URIs to end in '/'
 
 		# IP / port
 		if tup.count(":") == 0:
@@ -114,11 +157,3 @@ class UrlParser:
 		self.port = port
 		self.path = directory
 		self.params = params
-
-	def __repr__(self):
-		x = f"TLS: {self.secure}"
-		x = f"{x}\nHost: {self.host}"
-		x = f"{x}\nPort: {self.port}"
-		x = f"{x}\nPath: {self.path}"
-		x = f"{x}\nParams: {self.params}"
-		return x

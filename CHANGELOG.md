@@ -1,5 +1,14 @@
 # Changelog #
 
+## 0.4d ##
+* Added an option to perform wildcard response detection (`-wc`). This way, if a server replies with codes different than 404 for resources that are not found (for example with a redirection), those can be detected as well.
+* The input target is first checked for redirections. If a redirect is detected, the user is asked whether to update the target to the redirection location or not.
+* Changed the default number of connections to the number of cores in the target system multiplied by 2.
+* Improved cross-compatibility for Unix-like systems when spawning processes.
+* Entries found that are identified as directories are now indicated as such in the output.
+* Improved error and interrupt handling.
+* Minor performance enhancements.
+
 ## 0.4c ##
 * Added an option to change the HTTP request method (`-m`). Valid values are HEAD (default) and GET.
 * Added an option to display the response size (`-l`). This overrides the request method to GET.

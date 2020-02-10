@@ -12,5 +12,4 @@
 * Test [hyper](https://github.com/Lukasa/hyper)'s window_manager to increase throughput.
 * Add support for HTTP/1.
 * HTML parsing for web crawling (might slow things down a lot).
-* Add a custom 404 page content, so that sites that reply with a 200 code but display a "not found" page can be filtered. This requires parsing HTML. Alternatively, testing if web content is the same throughout several random requests.
 * Output results as a JSON file.
